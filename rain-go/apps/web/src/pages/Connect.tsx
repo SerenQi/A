@@ -16,6 +16,7 @@ const TOOLS: [string, string][] = [
   ["go_wait_for_opponent", "挂起等你落子，最长约 50 秒"],
   ["go_scoring", "数子阶段：标记死子、接受、继续下"],
   ["go_resign", "认输"],
+  ["go_rename", "改你或 AI 的名字"],
   ["go_say", "给你发一句悄悄话"],
 ];
 

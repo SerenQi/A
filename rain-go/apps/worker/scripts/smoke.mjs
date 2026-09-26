@@ -21,7 +21,7 @@ const call = async (name, args = {}) => {
 };
 
 const { tools } = await client.listTools();
-assert(tools.length === 8, `lists 8 tools (${tools.map((t) => t.name).join(", ")})`);
+assert(tools.length === 9, `lists 9 tools (${tools.map((t) => t.name).join(", ")})`);
 
 const created = await call("go_new_game", { size: 9, ai_color: "white", human_name: "Seren", ai_name: "Claude" });
 const id = /Game (\w+) ·/.exec(created.text)?.[1];
@@ -59,6 +59,13 @@ await new Promise((r) => setTimeout(r, 800));
 await human({ type: "play", point: 5 * 9 + 4 });
 const w3 = await pending;
 assert(w3.text.includes("Last: black E4") && !w3.text.includes("timed out"), "blocked wait wakes up when the human moves");
+
+const ren = await call("go_rename", { game_id: id, ai_name: "Lunare" });
+assert(!ren.isError && ren.text.includes("You play white") && ren.text.includes("Lunare (you)"), "AI renames itself");
+const hren = await human({ type: "rename", humanName: "Seren Qi", aiName: "Claude" });
+assert(hren.status === 200 && hren.body.record.humanName === "Seren Qi" && hren.body.record.aiName === "Claude", "human renames both sides");
+const badName = await human({ type: "rename", humanName: "  " });
+assert(badName.status === 409 && badName.body.error === "bad_name", "blank names are rejected");
 
 const occ = await call("go_play", { game_id: id, move: "E4" });
 assert(occ.isError && occ.text.includes("already occupied"), "occupied point is rejected");

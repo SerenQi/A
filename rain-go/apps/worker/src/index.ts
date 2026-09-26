@@ -47,7 +47,7 @@ app.get("/api/games/:id", async (c) => {
   return record ? c.json({ record }) : c.json({ error: "not_found" }, 404);
 });
 
-const ACTION_TYPES = new Set(["play", "pass", "resign", "toggle_dead", "accept", "resume", "say"]);
+const ACTION_TYPES = new Set(["play", "pass", "resign", "toggle_dead", "accept", "resume", "say", "rename"]);
 
 app.post("/api/games/:id/actions", async (c) => {
   if (!authorized(c.env, c.req.raw)) return unauthorized();

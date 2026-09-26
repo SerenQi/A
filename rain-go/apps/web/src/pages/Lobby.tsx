@@ -1,6 +1,8 @@
 import { motion } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, prefs, type GameMeta } from "../api";
+import { IconSwap } from "../components/icons";
+import { NameChips } from "../components/NameSheet";
 import { Pill, Ring } from "../components/Pill";
 import { Header, hhmm } from "../components/Shell";
 import { notifyPrefs } from "../components/Settings";
@@ -24,8 +26,9 @@ export function Lobby() {
   const [syncedAt, setSyncedAt] = useState<number | null>(null);
   const [size, setSize] = useState(9);
   const [color, setColor] = useState<"black" | "white">("black");
-  const [humanName, setHumanName] = useState("");
-  const [aiName, setAiName] = useState("");
+  const [humanName, setHumanName] = useState(() => prefs.lastNames().human);
+  const [aiName, setAiName] = useState(() => prefs.lastNames().ai);
+  const [nameFocus, setNameFocus] = useState<"human" | "ai">("human");
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -52,7 +55,9 @@ export function Lobby() {
   const create = async () => {
     setBusy(true);
     try {
-      const r = await api.createGame({ size, humanColor: color, komi: 7.5, humanName: humanName || undefined, aiName: aiName || undefined });
+      const r = await api.createGame({ size, humanColor: color, komi: 7.5, humanName: humanName.trim() || undefined, aiName: aiName.trim() || undefined });
+      prefs.rememberNames(humanName, aiName);
+      prefs.setLastNames(humanName, aiName);
       navigate(`/g/${r.id}`);
     } catch (e) {
       toast.show(e instanceof ApiError && e.status === 401 ? "需要访问口令" : "开局失败");
@@ -112,9 +117,44 @@ export function Lobby() {
                 我执白
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-2.5 lg:gap-3">
-              <input className="field !min-h-[42px] lg:!min-h-[46px]" value={humanName} onChange={(e) => setHumanName(e.target.value)} placeholder="你的名字" maxLength={40} />
-              <input className="field !min-h-[42px] lg:!min-h-[46px]" value={aiName} onChange={(e) => setAiName(e.target.value)} placeholder="AI 的名字" maxLength={40} />
+            <div className="relative grid grid-cols-2 gap-2.5 lg:gap-3">
+              <input
+                className="field !min-h-[42px] pr-6 lg:!min-h-[46px]"
+                value={humanName}
+                onChange={(e) => setHumanName(e.target.value)}
+                onFocus={() => setNameFocus("human")}
+                placeholder="你的名字"
+                maxLength={40}
+                list="recent-names"
+              />
+              <input
+                className="field !min-h-[42px] pl-6 lg:!min-h-[46px]"
+                value={aiName}
+                onChange={(e) => setAiName(e.target.value)}
+                onFocus={() => setNameFocus("ai")}
+                placeholder="AI 的名字"
+                maxLength={40}
+                list="recent-names"
+              />
+              <button
+                type="button"
+                aria-label="互换名字"
+                className="absolute top-1/2 left-1/2 grid h-8 w-8 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-white/80 bg-ink text-white shadow"
+                onClick={() => {
+                  setHumanName(aiName);
+                  setAiName(humanName);
+                }}
+              >
+                <IconSwap width={15} height={15} />
+              </button>
+              <datalist id="recent-names">
+                {prefs.recentNames().map((n) => (
+                  <option key={n} value={n} />
+                ))}
+              </datalist>
+            </div>
+            <div className="hidden lg:block">
+              <NameChips exclude={[humanName.trim(), aiName.trim()]} onPick={(n) => (nameFocus === "human" ? setHumanName(n) : setAiName(n))} />
             </div>
             <button className="btn btn-ink w-full !min-h-[44px] lg:!min-h-[46px]" disabled={busy || needToken} onClick={create}>
               开局

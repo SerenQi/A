@@ -3,6 +3,17 @@ import type { Action, GameRecord } from "@rain-go/engine";
 const TOKEN_KEY = "rain-go:token";
 const BG_KEY = "rain-go:bg";
 const LAST_GAME_KEY = "rain-go:last-game";
+const NAMES_KEY = "rain-go:names";
+const LAST_NAMES_KEY = "rain-go:last-names";
+
+const readJson = <T,>(k: string, fallback: T): T => {
+  try {
+    const v = JSON.parse(read(k) || "null") as T | null;
+    return v ?? fallback;
+  } catch {
+    return fallback;
+  }
+};
 
 const read = (k: string) => {
   try {
@@ -27,6 +38,17 @@ export const prefs = {
   setBackground: (v: string) => write(BG_KEY, v.trim()),
   lastGame: () => read(LAST_GAME_KEY),
   setLastGame: (v: string) => write(LAST_GAME_KEY, v),
+  /** Recently used player names, newest first. */
+  recentNames: (): string[] => readJson<string[]>(NAMES_KEY, []).filter((n) => typeof n === "string"),
+  rememberNames: (...names: (string | undefined)[]) => {
+    const add = names.map((n) => n?.trim()).filter((n): n is string => Boolean(n));
+    if (!add.length) return;
+    const list = [...add, ...prefs.recentNames().filter((n) => !add.includes(n))].slice(0, 10);
+    write(NAMES_KEY, JSON.stringify(list));
+  },
+  forgetName: (name: string) => write(NAMES_KEY, JSON.stringify(prefs.recentNames().filter((n) => n !== name))),
+  lastNames: () => readJson<{ human: string; ai: string }>(LAST_NAMES_KEY, { human: "", ai: "" }),
+  setLastNames: (human: string, ai: string) => write(LAST_NAMES_KEY, JSON.stringify({ human: human.trim(), ai: ai.trim() })),
 };
 
 export class ApiError extends Error {

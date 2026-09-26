@@ -13,7 +13,8 @@ Flow:
 3. Otherwise call go_wait_for_opponent. It blocks up to ~50s; call it again if it times out.
 4. After two passes the game enters scoring: mark dead chains with go_scoring toggle_dead, then accept. Either side may resume play instead.
 Rules: Chinese area scoring, positional superko, suicide forbidden. Board text uses X for black, O for white, + for star points, lowercase for stones marked dead.
-You may talk to the human with the "say" argument of go_play or with go_say. Keep it short and warm.`;
+You may talk to the human with the "say" argument of go_play or with go_say. Keep it short and warm.
+Either side's display name can be changed at any time with go_rename, for example when the human asks you to call them something else.`;
 
 const text = (t: string, isError = false) => ({ content: [{ type: "text" as const, text: t }], isError });
 
@@ -199,6 +200,23 @@ export function buildMcpServer(env: Env, origin: string): McpServer {
       annotations: { destructiveHint: true },
     },
     async ({ game_id }) => act(game_id, [{ type: "resign" }]),
+  );
+
+  server.registerTool(
+    "go_rename",
+    {
+      title: "Rename players",
+      description: "Change the display name of the human, of yourself, or both. The board page updates at once.",
+      inputSchema: {
+        game_id: gameIdArg,
+        human_name: z.string().min(1).max(40).optional().describe("New name for the human."),
+        ai_name: z.string().min(1).max(40).optional().describe("New name for you."),
+      },
+    },
+    async ({ game_id, human_name, ai_name }) => {
+      if (human_name === undefined && ai_name === undefined) return text("Give human_name, ai_name, or both.", true);
+      return act(game_id, [{ type: "rename", humanName: human_name, aiName: ai_name }]);
+    },
   );
 
   server.registerTool(

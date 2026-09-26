@@ -171,6 +171,20 @@ describe("record actions", () => {
     expect(resultOf(r, last.state)?.text).toBe("B+73.5");
   });
 
+  it("renames either side at any time, from either player", () => {
+    let r = fresh();
+    const a = applyAction(r, "ai", { type: "rename", aiName: "  Lunare ", humanName: "Seren  Qi" }, 5);
+    expect(a.ok).toBe(true);
+    if (!a.ok) return;
+    r = a.record;
+    expect([r.humanName, r.aiName]).toEqual(["Seren Qi", "Lunare"]);
+    const swap = applyAction(r, "human", { type: "rename", humanName: r.aiName, aiName: r.humanName }, 6);
+    expect(swap.ok && [swap.record.humanName, swap.record.aiName]).toEqual(["Lunare", "Seren Qi"]);
+    expect(applyAction(r, "human", { type: "rename", humanName: "   " }, 7).ok).toBe(false);
+    expect(applyAction(r, "human", { type: "rename", aiName: "x".repeat(41) }, 7).ok).toBe(false);
+    expect(applyAction(r, "human", { type: "rename" }, 7).ok).toBe(false);
+  });
+
   it("resigning ends the game", () => {
     const res = applyAction(fresh(), "ai", { type: "resign" }, 1);
     expect(res.ok && resultOf(res.record, res.state)?.text).toBe("B+R");

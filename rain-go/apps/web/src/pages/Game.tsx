@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, ApiError, prefs } from "../api";
 import { BRAND } from "../brand";
 import { Board } from "../components/Board";
-import { DropMark, IconChat, IconSend } from "../components/icons";
+import { DropMark, IconChat, IconName, IconSend } from "../components/icons";
+import { NameSheet } from "../components/NameSheet";
 import { Pill, Ring, Stat } from "../components/Pill";
 import { Header, hhmm, useWide } from "../components/Shell";
 import { useToast } from "../components/Toast";
@@ -99,6 +100,7 @@ export function Game({ id }: { id: string }) {
   const wide = useWide();
   const [busy, setBusy] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [namesOpen, setNamesOpen] = useState(false);
   const [seenChat, setSeenChat] = useState(0);
 
   useEffect(() => prefs.setLastGame(id), [id]);
@@ -231,6 +233,16 @@ export function Game({ id }: { id: string }) {
     <ChatInput aiName={record.aiName} busy={busy} compact={compact} onSend={(text) => send({ type: "say", text })} />
   );
 
+  const namesSheet = namesOpen && (
+    <NameSheet
+      humanName={record.humanName}
+      aiName={record.aiName}
+      humanColor={human}
+      onClose={() => setNamesOpen(false)}
+      onSave={(humanName, aiName) => send({ type: "rename", humanName, aiName })}
+    />
+  );
+
   if (!wide) {
     // One screen, no scrolling: status in the header, pill, board, one row of actions.
     const headerLeft = (
@@ -269,6 +281,9 @@ export function Game({ id }: { id: string }) {
 
           <div className="flex shrink-0 gap-2">
             {controls}
+            <button className="btn btn-glass shrink-0 !min-h-[44px] !px-3.5" onClick={() => setNamesOpen(true)} aria-label="名字">
+              <IconName width={20} height={20} />
+            </button>
             <button className="btn btn-glass relative shrink-0 !min-h-[44px] !px-3.5" onClick={() => setChatOpen(true)} aria-label="聊天">
               <IconChat width={20} height={20} />
               {unread && <span className="absolute top-1.5 right-2 h-2 w-2 rounded-full bg-accent" />}
@@ -276,6 +291,7 @@ export function Game({ id }: { id: string }) {
           </div>
         </div>
         {chatOpen && <ChatSheet chat={record.chat} onClose={() => setChatOpen(false)} input={sayInput(true)} />}
+        {namesSheet}
       </>
     );
   }
@@ -295,8 +311,13 @@ export function Game({ id }: { id: string }) {
               {BRAND.en} · {record.size}路
             </div>
             <div className="mt-1 text-[4.2rem] font-bold leading-[1.02] tracking-tight">{phase === "finished" ? result?.text : `Move ${moves}`}</div>
-            <div className="mt-3 text-[1.1rem] text-muted">
-              {record.humanName} 执{colorZh(human)} · {record.aiName} 执{colorZh(ai)} · 贴 {record.komi}
+            <div className="mt-3 flex flex-wrap items-center gap-x-2 text-[1.1rem] text-muted">
+              <span>
+                {record.humanName} 执{colorZh(human)} · {record.aiName} 执{colorZh(ai)} · 贴 {record.komi}
+              </span>
+              <button className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[0.95rem] text-ink-2 hover:bg-white/50" onClick={() => setNamesOpen(true)}>
+                <IconName width={16} height={16} /> 改名
+              </button>
             </div>
             <div className="mt-1 text-[1.05rem] text-ink">{status}</div>
           </div>
@@ -340,6 +361,7 @@ export function Game({ id }: { id: string }) {
           <div className="mt-3 flex">{sayInput(false)}</div>
         </motion.section>
       </div>
+      {namesSheet}
     </>
   );
 }

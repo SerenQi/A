@@ -55,6 +55,17 @@ export const DropMark = (p: SVGProps<SVGSVGElement>) => (
     <path d="M17 35a8 8 0 0 0 7 4" stroke="#0a0a0a" strokeWidth="1.6" strokeLinecap="round" fill="none" opacity="0.25" />
   </svg>
 );
+export const IconSwap = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <path d="M7 7h11l-3-3M17 17H6l3 3" />
+  </svg>
+);
+export const IconName = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <circle cx="9" cy="9" r="3.2" />
+    <path d="M3.5 19a5.5 5.5 0 0 1 11 0M15.5 8.5h5M15.5 12h5M17.5 15.5h3" />
+  </svg>
+);
 export const IconChat = (p: SVGProps<SVGSVGElement>) => (
   <svg {...base(p)}>
     <path d="M20 11.5a7.5 7.5 0 0 1-11 6.6L4.5 19.5l1.4-4A7.5 7.5 0 1 1 20 11.5z" />

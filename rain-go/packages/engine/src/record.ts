@@ -12,13 +12,23 @@ export type Action =
   | { type: "toggle_dead"; point: number }
   | { type: "accept" }
   | { type: "resume" }
-  | { type: "say"; text: string };
+  | { type: "say"; text: string }
+  /** Either player may rename either side at any time. */
+  | { type: "rename"; humanName?: string; aiName?: string };
 
 export type ActionResult =
   | { ok: true; record: GameRecord; state: GameState }
   | { ok: false; error: string; message: string };
 
 export const MAX_CHAT_LENGTH = 280;
+export const MAX_NAME_LENGTH = 40;
+
+/** Trims a display name; returns null when it is empty or too long. */
+export function cleanName(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const t = v.trim().replace(/\s+/g, " ");
+  return t && t.length <= MAX_NAME_LENGTH ? t : null;
+}
 
 export interface NewGameOptions {
   id: string;
@@ -134,6 +144,17 @@ export function applyAction(r: GameRecord, actor: Actor, action: Action, now: nu
       const accepted = r.accepted.includes(color) ? r.accepted : [...r.accepted, color];
       const patch: Partial<GameRecord> = { accepted };
       if (accepted.length === 2) patch.finalScore = areaScore(state.cells, r.size, r.dead, r.komi);
+      return { ok: true, record: bump(patch), state };
+    }
+    case "rename": {
+      const patch: Partial<GameRecord> = {};
+      for (const key of ["humanName", "aiName"] as const) {
+        if (action[key] === undefined) continue;
+        const name = cleanName(action[key]);
+        if (!name) return fail("bad_name", `Names must be 1-${MAX_NAME_LENGTH} characters.`);
+        patch[key] = name;
+      }
+      if (!Object.keys(patch).length) return fail("bad_name", "Give at least one new name.");
       return { ok: true, record: bump(patch), state };
     }
     case "say": {
