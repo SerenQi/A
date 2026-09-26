@@ -1,5 +1,5 @@
 import { DDZ_SUIT_SYMBOL, ddzSuit } from "@rain-go/engine";
-import { useEffect, useState, type CSSProperties, type RefObject } from "react";
+import { useEffect, useId, useState, type CSSProperties, type RefObject } from "react";
 
 /** Measures an element's content box. */
 export function useDdzBox(ref: RefObject<HTMLElement | null>) {
@@ -20,8 +20,38 @@ const SHADOW = "0 1px 1.5px rgb(0 0 0 / 0.12), 0 4px 10px rgb(0 0 0 / 0.07), ins
 
 /**
  * A face-up card: white glass rectangle, serif rank in the corner with the suit below it.
- * Jokers read 大/王 (accent) and 小/王 (ink) down the corner.
+ * Jokers read JOKER down the corner like a real deck; the big joker carries a full moon in the
+ * accent colour, the small joker a crescent moon in ink, each with a small star.
  */
+/** Full moon (big joker, accent) or crescent (small joker, ink) with a small star. */
+function JokerMoon({ big, size, style }: { big: boolean; size: number; style: CSSProperties }) {
+  const id = useId().replace(/:/g, "");
+  const ink = big ? "var(--color-accent)" : "var(--color-ink)";
+  return (
+    <svg className="absolute" width={size} height={size} viewBox="0 0 40 40" style={style} aria-hidden>
+      <defs>
+        <radialGradient id={`jm-${id}`} cx="38%" cy="34%" r="70%">
+          <stop offset="0" stopColor={big ? "#d27a72" : "#4a4a4a"} />
+          <stop offset="1" stopColor={ink} />
+        </radialGradient>
+        <mask id={`jc-${id}`}>
+          <rect width="40" height="40" fill="#fff" />
+          <circle cx="27" cy="16" r="13" fill="#000" />
+        </mask>
+      </defs>
+      {big ? (
+        <>
+          <circle cx="21" cy="22" r="14" fill={`url(#jm-${id})`} />
+          <circle cx="21" cy="22" r="16.5" fill="none" stroke={ink} strokeWidth="0.9" opacity="0.45" />
+        </>
+      ) : (
+        <circle cx="20" cy="22" r="14" fill={`url(#jm-${id})`} mask={`url(#jc-${id})`} />
+      )}
+      <path d="M33 4.5 L34.2 7.8 L37.5 8 L34.9 10.1 L35.8 13.4 L33 11.5 L30.2 13.4 L31.1 10.1 L28.5 8 L31.8 7.8 Z" fill={ink} opacity="0.85" />
+    </svg>
+  );
+}
+
 export function DdzCard({
   card,
   w,
@@ -68,17 +98,25 @@ export function DdzCard({
       {joker ? (
         <>
           <div
-            className="absolute flex flex-col items-center font-serif font-semibold leading-[1.02]"
-            style={{ left: w * 0.06, top: w * 0.08, width: Math.min(w * 0.36, vis), fontSize: Math.max(8, Math.min(w * 0.3, vis * 0.85)) }}
+            className="pointer-events-none absolute border"
+            style={{ inset: w * 0.05, borderRadius: Math.max(3, w * 0.09), borderColor: card === "RJ" ? "rgb(168 67 63 / 0.28)" : "rgb(11 11 11 / 0.14)" }}
+          />
+          <div
+            className="absolute flex flex-col items-center font-serif font-semibold"
+            style={{
+              left: w * 0.07,
+              top: w * 0.09,
+              width: Math.min(w * 0.3, vis),
+              fontSize: Math.max(6.5, Math.min(w * 0.17, vis * 0.72, h * 0.13)),
+              lineHeight: 0.98,
+              letterSpacing: "0.02em",
+            }}
           >
-            <span>{card === "RJ" ? "大" : "小"}</span>
-            <span>王</span>
+            {"JOKER".split("").map((ch, i) => (
+              <span key={i}>{ch}</span>
+            ))}
           </div>
-          {full && (
-            <span className="absolute font-serif leading-none" style={{ right: w * 0.1, bottom: w * 0.08, fontSize: w * 0.44, opacity: card === "RJ" ? 0.85 : 0.7 }}>
-              ★
-            </span>
-          )}
+          {full && <JokerMoon big={card === "RJ"} size={w * 0.52} style={{ right: w * 0.09, bottom: w * 0.09 }} />}
         </>
       ) : (
         <>
