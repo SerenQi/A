@@ -215,14 +215,16 @@ export function MatchScreen({
             </div>
           </motion.section>
         )}
-        <motion.section {...card} className="glass area-chat px-6 py-5">
-          <div className="text-[1.3rem] font-semibold">Whisper</div>
-          <ChatList chat={match.chat} me={me} className="mt-3 max-h-56" />
-          <div className="mt-3 flex">
-            <ChatInput to={nameOf(them)} busy={busy} onSend={(text) => send({ type: "say", text })} />
-          </div>
-        </motion.section>
-        {extra && <div className="area-chat">{extra}</div>}
+        <div className="area-chat flex flex-col gap-3">
+          <motion.section {...card} className="glass px-6 py-5">
+            <div className="text-[1.3rem] font-semibold">Whisper</div>
+            <ChatList chat={match.chat} me={me} className="mt-3 max-h-56" />
+            <div className="mt-3 flex">
+              <ChatInput to={nameOf(them)} busy={busy} onSend={(text) => send({ type: "say", text })} />
+            </div>
+          </motion.section>
+          {extra}
+        </div>
       </div>
       {sheets}
     </>
