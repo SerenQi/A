@@ -340,7 +340,7 @@ function Actions({ view: v, canAct, send, compact }: BoardProps<MonopolyView>) {
   const offer = v.offer ? v.spaces[v.offer.index]! : null;
   const items: { move: string; label: string }[] = [];
   if (legal.has("roll")) items.push({ move: "roll", label: v.rollAgain ? "再掷一次" : v.players[v.me].inJail ? "掷对子" : "掷骰子" });
-  if (legal.has("buy") && offer) items.push({ move: "buy", label: `买下${offer.name} (${offer.price})` });
+  if (legal.has("buy") && offer) items.push({ move: "buy", label: compact ? `买下 (${offer.price})` : `买下${offer.name} (${offer.price})` });
   if (legal.has("skip")) items.push({ move: "skip", label: "不买" });
   if (legal.has("pay")) items.push({ move: "pay", label: compact ? "交 50" : "交 50 出狱" });
   if (legal.has("card")) items.push({ move: "card", label: compact ? "用卡" : "用出狱卡" });
@@ -375,7 +375,7 @@ export const monopolyUI: GameUI<MonopolyView> = {
       const sp = v.spaces[v.offer.index]!;
       return p.cash >= sp.price! ? `要不要买${sp.name}？` : `钱不够买${sp.name}`;
     }
-    if (v.phase === "roll") return p.inJail ? "在拘留所：掷对子、交 50 或用卡" : v.rollAgain ? "对子！再掷一次" : "到你掷骰";
+    if (v.phase === "roll") return p.inJail ? (p.cards ? "拘留中：掷对子、交 50 或用卡" : "拘留中：掷对子或交 50") : v.rollAgain ? "对子！再掷一次" : "到你掷骰";
     return v.buildable.length ? "点自己的地可以盖房" : "可以结束回合";
   },
   badge: (v) => ({ value: String(v.players[v.me].cash), label: "CASH" }),
