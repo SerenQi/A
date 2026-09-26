@@ -1,5 +1,5 @@
 import { randomInt, shuffled } from "../match/rng";
-import { otherActor, type Actor, type LegacyGameModule } from "../match/types";
+import type { GameModule, Outcome, Seat } from "../match/types";
 import {
   MONOPOLY_BOARD_SIZE,
   MONOPOLY_CARDS,
@@ -10,14 +10,16 @@ import {
   MONOPOLY_MAX_HOUSES,
   MONOPOLY_SPACES,
   MONOPOLY_START_CASH,
+  MONOPOLY_TOKENS,
   type MonopolySpace,
 } from "./monopoly-board";
 
 export * from "./monopoly-board";
 
 /**
- * 大富翁: a two-player Monopoly-style dice game on a 24-space ring.
+ * 大富翁: a Monopoly-style dice game for 2-4 seats on a 24-space ring.
  * Board data lives in ./monopoly-board; the state keeps owners, houses, cash, the chance deck and the RNG.
+ * Seat 0 moves first and turns go round in seat order, skipping bankrupt players.
  */
 export interface MonopolyPlayer {
   cash: number;
@@ -27,6 +29,8 @@ export interface MonopolyPlayer {
   jailTries: number;
   /** Get-out-of-jail cards held. */
   cards: number;
+  /** Out of the game: skipped, owns nothing. */
+  bankrupt: boolean;
 }
 
 /** roll: must roll (or pay / use a card in jail). buy: decide on the unowned property. end: may build, then end. */
@@ -51,39 +55,39 @@ export type MonopolyEventKind =
   | "over";
 
 export interface MonopolyEvent {
-  /** Whose money or token the event is about (usually the player whose turn it is). */
-  actor: Actor;
+  /** Whose money or token the event is about (usually the seat whose turn it is). */
+  seat: Seat;
   kind: MonopolyEventKind;
   zh: string;
   en: string;
+  /** The other party of a payment (rent owner, card payer or payee). Shown as "给 X" / "to X". */
+  other?: Seat;
 }
 
-export interface MonopolyResult {
-  winner: Actor | "draw";
-  text: string;
+export interface MonopolyTurnLog {
+  seat: Seat;
+  events: MonopolyEvent[];
 }
 
 export interface MonopolyState {
-  players: Record<Actor, MonopolyPlayer>;
-  /** Owner of each space (null for unowned or non-property spaces). */
-  owner: (Actor | null)[];
+  players: MonopolyPlayer[];
+  /** Owner seat of each space (null for unowned or non-property spaces). */
+  owner: (Seat | null)[];
   /** House levels (0-3) on each space. */
   houses: number[];
-  /** Who moves first each round. */
-  first: Actor;
-  turn: Actor;
+  turn: Seat;
   phase: MonopolyPhase;
   /** Doubles rolled in a row this turn. */
   doubles: number;
   /** The last roll was a double, so the next action is another roll. */
   rollAgain: boolean;
-  /** Last dice rolled (by either player). */
+  /** Last dice rolled (by anyone). */
   dice: [number, number] | null;
   /** Events of the current turn. */
   events: MonopolyEvent[];
-  /** The previous turn's events, so the other side can see what happened. */
-  lastTurn: { actor: Actor; events: MonopolyEvent[] } | null;
-  /** 1-based round number. A round is one turn by each player. */
+  /** The last few finished turns, oldest first (at most 4). */
+  past: MonopolyTurnLog[];
+  /** 1-based round number. A round is one turn by each player still in the game. */
   round: number;
   /** Round limit, 0 for none. */
   rounds: number;
@@ -94,42 +98,44 @@ export interface MonopolyState {
   deck: number[];
   /** Test hook: dice to use before the RNG. Hidden. */
   riggedDice?: [number, number][];
-  over?: MonopolyResult;
+  over?: Outcome;
 }
 
 export interface MonopolySpaceView extends MonopolySpace {
-  owner: Actor | null;
+  owner: Seat | null;
   houses: number;
   /** Rent a visitor would pay right now (properties only). */
   rentNow?: number;
 }
 
 export interface MonopolyPlayerView extends MonopolyPlayer {
+  seat: Seat;
+  /** Token name: 墨 (ink), 乳 (milk), 灰 (grey), 朱 (milk with an accent ring). */
+  token: string;
   worth: number;
-  seat: string;
-  /** Ink token (first player) or milk token. */
-  ink: boolean;
+  /** Properties owned. */
+  props: number;
 }
 
 export interface MonopolyView {
-  /** Who this view was built for. */
-  me: Actor;
+  /** Who this view was built for (null for a spectator). */
+  me: Seat | null;
   spaces: MonopolySpaceView[];
-  players: Record<Actor, MonopolyPlayerView>;
-  first: Actor;
-  turn: Actor;
+  players: MonopolyPlayerView[];
+  turn: Seat;
   phase: MonopolyPhase;
   doubles: number;
   rollAgain: boolean;
   dice: [number, number] | null;
   events: MonopolyEvent[];
-  lastTurn: { actor: Actor; events: MonopolyEvent[] } | null;
+  past: MonopolyTurnLog[];
+  lastTurn: MonopolyTurnLog | null;
   round: number;
   rounds: number;
   seq: number;
   deckLeft: number;
-  over: MonopolyResult | null;
-  /** Legal move strings for the player whose turn it is. */
+  over: Outcome | null;
+  /** Legal move strings for the seat whose turn it is. */
   legal: string[];
   /** Spaces the current player may build on now, with the cost of the next level. */
   buildable: { index: number; cost: number }[];
@@ -142,50 +148,51 @@ const space = (i: number) => MONOPOLY_SPACES[i]!;
 const nameOf = (i: number) => space(i).name;
 const clone = <T>(x: T): T => JSON.parse(JSON.stringify(x)) as T;
 const groupSpaces = (g: number) => MONOPOLY_SPACES.filter((sp) => sp.group === g).map((sp) => sp.index);
+export const monopolyToken = (seat: Seat) => MONOPOLY_TOKENS[seat] ?? `${seat + 1}`;
+const activeSeats = (s: MonopolyState) => s.players.map((_, i) => i).filter((i) => !s.players[i]!.bankrupt);
 
-export function monopolyOwnsGroup(s: MonopolyState, actor: Actor, group: number): boolean {
-  return groupSpaces(group).every((i) => s.owner[i] === actor);
+export function monopolyOwnsGroup(s: MonopolyState, seat: Seat, group: number): boolean {
+  return groupSpaces(group).every((i) => s.owner[i] === seat);
 }
 
 /** Rent due on landing at `i` (0 if unowned or not a property). */
 export function monopolyRent(s: MonopolyState, i: number): number {
   const sp = space(i);
   const owner = s.owner[i];
-  if (sp.kind !== "property" || !owner) return 0;
+  if (sp.kind !== "property" || owner === null || owner === undefined) return 0;
   const h = s.houses[i] ?? 0;
   if (h > 0) return sp.rent![h]!;
   return monopolyOwnsGroup(s, owner, sp.group!) ? sp.rent![0] * 2 : sp.rent![0];
 }
 
 /** Cash + property prices + house costs. */
-export function monopolyWorth(s: MonopolyState, actor: Actor): number {
-  let w = s.players[actor].cash;
-  for (const sp of MONOPOLY_SPACES) if (s.owner[sp.index] === actor) w += sp.price! + (s.houses[sp.index] ?? 0) * sp.houseCost!;
+export function monopolyWorth(s: MonopolyState, seat: Seat): number {
+  let w = s.players[seat]!.cash;
+  for (const sp of MONOPOLY_SPACES) if (s.owner[sp.index] === seat) w += sp.price! + (s.houses[sp.index] ?? 0) * sp.houseCost!;
   return w;
 }
 
-/** Spaces `actor` could build on right now if it were their build window, with the next level's cost. */
-function buildOptions(s: MonopolyState, actor: Actor): { index: number; cost: number }[] {
+/** Spaces `seat` could build on right now if it were their build window, with the next level's cost. */
+function buildOptions(s: MonopolyState, seat: Seat): { index: number; cost: number }[] {
   return MONOPOLY_SPACES.filter(
     (sp) =>
       sp.kind === "property" &&
-      s.owner[sp.index] === actor &&
-      monopolyOwnsGroup(s, actor, sp.group!) &&
+      s.owner[sp.index] === seat &&
+      monopolyOwnsGroup(s, seat, sp.group!) &&
       (s.houses[sp.index] ?? 0) < MONOPOLY_MAX_HOUSES &&
-      s.players[actor].cash >= sp.houseCost!,
+      s.players[seat]!.cash >= sp.houseCost!,
   ).map((sp) => ({ index: sp.index, cost: sp.houseCost! }));
 }
 
 const canBuildNow = (s: MonopolyState) => !s.over && s.phase !== "buy";
 
-/** Legal moves for the player whose turn it is. */
+/** Legal moves for the seat whose turn it is. */
 export function monopolyLegal(s: MonopolyState): string[] {
   if (s.over) return [];
-  const p = s.players[s.turn];
+  const p = s.players[s.turn]!;
   const out: string[] = [];
   if (s.phase === "buy") {
-    const i = p.pos;
-    if (p.cash >= space(i).price!) out.push("buy");
+    if (p.cash >= space(p.pos).price!) out.push("buy");
     out.push("skip");
     return out;
   }
@@ -209,10 +216,18 @@ export function monopolyPatch(s: MonopolyState, patch: Partial<MonopolyState>): 
   return { ...clone(s), ...clone(patch) };
 }
 
+/** An event line in Chinese; `who` names a seat (token or player name). */
+export function monopolyEventZh(e: MonopolyEvent, who: (seat: Seat) => string): string {
+  return e.other === undefined ? e.zh : `${e.zh} 给${who(e.other)}`;
+}
+function eventEn(e: MonopolyEvent, who: (seat: Seat) => string): string {
+  return e.other === undefined ? e.en : `${e.en} to ${who(e.other)}`;
+}
+
 // ---------- mutation helpers (operate on a private clone) ----------
 
-function ev(s: MonopolyState, actor: Actor, kind: MonopolyEventKind, zh: string, en: string) {
-  s.events.push({ actor, kind, zh, en });
+function ev(s: MonopolyState, seat: Seat, kind: MonopolyEventKind, zh: string, en: string, other?: Seat) {
+  s.events.push(other === undefined ? { seat, kind, zh, en } : { seat, kind, zh, en, other });
 }
 
 function rollDice(s: MonopolyState): [number, number] {
@@ -227,30 +242,56 @@ function rollDice(s: MonopolyState): [number, number] {
   return [a + 1, b + 1];
 }
 
-function sendToJail(s: MonopolyState, actor: Actor) {
-  const p = s.players[actor];
+function sendToJail(s: MonopolyState, seat: Seat) {
+  const p = s.players[seat]!;
   p.pos = MONOPOLY_JAIL;
   p.inJail = true;
   p.jailTries = 0;
-  if (actor === s.turn) {
+  if (seat === s.turn) {
     s.rollAgain = false;
     s.phase = "end";
   }
-  ev(s, actor, "jail", "进拘留所", `sent to jail (${MONOPOLY_JAIL} 拘留所)`);
+  ev(s, seat, "jail", "进拘留所", `sent to jail (${MONOPOLY_JAIL} 拘留所)`);
 }
 
-/** Sells houses, then returns properties, until cash >= 0; otherwise the player goes bankrupt. */
-function settle(s: MonopolyState, actor: Actor) {
-  const p = s.players[actor];
-  if (p.cash >= 0) return;
-  const mine = MONOPOLY_SPACES.filter((sp) => sp.kind === "property" && s.owner[sp.index] === actor);
+/** Puts `seat` out of the game. Ends the game when one player is left. */
+function goBankrupt(s: MonopolyState, seat: Seat) {
+  const p = s.players[seat]!;
+  for (let i = 0; i < N; i++) {
+    if (s.owner[i] === seat) {
+      s.owner[i] = null;
+      s.houses[i] = 0;
+    }
+  }
+  p.cash = 0;
+  p.bankrupt = true;
+  p.inJail = false;
+  p.jailTries = 0;
+  p.cards = 0;
+  ev(s, seat, "bankrupt", "破产出局", "went bankrupt and is out");
+  const left = activeSeats(s);
+  if (left.length === 1) {
+    const gone = s.players.length - 1;
+    s.over = { winners: left, text: `${gone} 人破产` };
+    ev(s, left[0]!, "over", `${gone} 人破产，只剩一人`, `${gone} bankrupt: last player standing`);
+  }
+}
+
+/**
+ * Sells houses, then returns properties, until cash >= 0; otherwise the player goes bankrupt.
+ * Returns the shortfall that could not be paid (0 when settled).
+ */
+function settle(s: MonopolyState, seat: Seat): number {
+  const p = s.players[seat]!;
+  if (p.cash >= 0) return 0;
+  const mine = MONOPOLY_SPACES.filter((sp) => sp.kind === "property" && s.owner[sp.index] === seat);
   const byHouse = [...mine].sort((a, b) => a.houseCost! - b.houseCost! || a.index - b.index);
   for (const sp of byHouse) {
     while (p.cash < 0 && (s.houses[sp.index] ?? 0) > 0) {
       s.houses[sp.index]!--;
       const got = sp.houseCost! / 2;
       p.cash += got;
-      ev(s, actor, "sell", `卖掉${sp.name}一层房 +${got}`, `sold a house level on ${sp.name} (${sp.index}) for ${got}`);
+      ev(s, seat, "sell", `卖掉${sp.name}一层房 +${got}`, `sold a house level on ${sp.name} (${sp.index}) for ${got}`);
     }
   }
   const byPrice = [...mine].sort((a, b) => a.price! - b.price! || a.index - b.index);
@@ -260,71 +301,75 @@ function settle(s: MonopolyState, actor: Actor) {
     s.owner[sp.index] = null;
     s.houses[sp.index] = 0;
     p.cash += got;
-    ev(s, actor, "sell", `把${sp.name}退给银行 +${got}`, `returned ${sp.name} (${sp.index}) to the bank for ${got}`);
+    ev(s, seat, "sell", `把${sp.name}退给银行 +${got}`, `returned ${sp.name} (${sp.index}) to the bank for ${got}`);
   }
-  if (p.cash < 0) {
-    ev(s, actor, "bankrupt", "破产", "went bankrupt");
-    s.over = { winner: otherActor(actor), text: "破产" };
-  }
+  if (p.cash >= 0) return 0;
+  const short = -p.cash;
+  goBankrupt(s, seat);
+  return short;
 }
 
-function pay(s: MonopolyState, from: Actor, amount: number, to: Actor | null) {
-  s.players[from].cash -= amount;
-  if (to) s.players[to].cash += amount;
-  settle(s, from);
+/** `from` pays `amount` to `to` (null: the bank). A bankrupt payer hands over only what they could raise. */
+function pay(s: MonopolyState, from: Seat, amount: number, to: Seat | null) {
+  s.players[from]!.cash -= amount;
+  const short = settle(s, from);
+  if (to !== null) s.players[to]!.cash += amount - short;
 }
+
+const isOut = (s: MonopolyState, seat: Seat) => Boolean(s.over) || s.players[seat]!.bankrupt;
 
 /** Moves forward `n` steps (collecting 200 when passing or landing on 起点) and resolves the space. */
-function moveForward(s: MonopolyState, actor: Actor, n: number) {
-  const p = s.players[actor];
+function moveForward(s: MonopolyState, seat: Seat, n: number) {
+  const p = s.players[seat]!;
   const to = (p.pos + n) % N;
   const passed = p.pos + n >= N;
   p.pos = to;
   if (to === 0) {
     p.cash += MONOPOLY_GO_BONUS;
-    ev(s, actor, "move", `到起点，领 ${MONOPOLY_GO_BONUS}`, `landed on 起点 (0), collected ${MONOPOLY_GO_BONUS}`);
+    ev(s, seat, "move", `到起点，领 ${MONOPOLY_GO_BONUS}`, `landed on 起点 (0), collected ${MONOPOLY_GO_BONUS}`);
   } else {
     if (passed) {
       p.cash += MONOPOLY_GO_BONUS;
-      ev(s, actor, "go", `经过起点，领 ${MONOPOLY_GO_BONUS}`, `passed 起点, collected ${MONOPOLY_GO_BONUS}`);
+      ev(s, seat, "go", `经过起点，领 ${MONOPOLY_GO_BONUS}`, `passed 起点, collected ${MONOPOLY_GO_BONUS}`);
     }
-    ev(s, actor, "move", `到${nameOf(to)}`, `moved to ${nameOf(to)} (${to})`);
+    ev(s, seat, "move", `到${nameOf(to)}`, `moved to ${nameOf(to)} (${to})`);
   }
-  resolve(s, actor);
+  resolve(s, seat);
 }
 
-function moveBack(s: MonopolyState, actor: Actor, n: number) {
-  const p = s.players[actor];
+function moveBack(s: MonopolyState, seat: Seat, n: number) {
+  const p = s.players[seat]!;
   const to = (p.pos - n + N) % N;
   p.pos = to;
   if (to === 0) {
     p.cash += MONOPOLY_GO_BONUS;
-    ev(s, actor, "move", `退到起点，领 ${MONOPOLY_GO_BONUS}`, `moved back to 起点 (0), collected ${MONOPOLY_GO_BONUS}`);
-  } else ev(s, actor, "move", `退到${nameOf(to)}`, `moved back to ${nameOf(to)} (${to})`);
-  resolve(s, actor);
+    ev(s, seat, "move", `退到起点，领 ${MONOPOLY_GO_BONUS}`, `moved back to 起点 (0), collected ${MONOPOLY_GO_BONUS}`);
+  } else ev(s, seat, "move", `退到${nameOf(to)}`, `moved back to ${nameOf(to)} (${to})`);
+  resolve(s, seat);
 }
 
-function drawCard(s: MonopolyState, actor: Actor) {
+function drawCard(s: MonopolyState, seat: Seat) {
   if (!s.deck.length) {
-    const held = s.players.human.cards + s.players.ai.cards > 0;
+    const held = s.players.some((p) => p.cards > 0);
     const ids = MONOPOLY_CARDS.map((c) => c.id).filter((id) => !(held && id === MONOPOLY_JAILFREE_CARD));
     const [deck, rng] = shuffled(ids, s.rng);
     s.deck = deck;
     s.rng = rng;
-    ev(s, actor, "shuffle", "命运牌重洗", "the chance deck was reshuffled");
+    ev(s, seat, "shuffle", "命运牌重洗", "the chance deck was reshuffled");
   }
   const card = MONOPOLY_CARDS[s.deck.shift()!]!;
-  ev(s, actor, "card", `命运：${card.zh}`, `chance card: ${card.en}`);
-  const p = s.players[actor];
+  ev(s, seat, "card", `命运：${card.zh}`, `chance card: ${card.en}`);
+  const p = s.players[seat]!;
+  const others = activeSeats(s).filter((i) => i !== seat);
   switch (card.kind) {
     case "goto":
-      return moveForward(s, actor, (card.n - p.pos + N) % N || N);
+      return moveForward(s, seat, (card.n - p.pos + N) % N || N);
     case "forward":
-      return moveForward(s, actor, card.n);
+      return moveForward(s, seat, card.n);
     case "back":
-      return moveBack(s, actor, card.n);
+      return moveBack(s, seat, card.n);
     case "jail":
-      return sendToJail(s, actor);
+      return sendToJail(s, seat);
     case "jailfree":
       p.cards++;
       return;
@@ -332,42 +377,54 @@ function drawCard(s: MonopolyState, actor: Actor) {
       p.cash += card.n;
       return;
     case "pay":
-      return pay(s, actor, card.n, null);
-    case "fromOpponent":
-      return pay(s, otherActor(actor), card.n, actor);
+      return pay(s, seat, card.n, null);
+    case "fromEach":
+      for (const o of others) {
+        if (s.over) return;
+        ev(s, o, "cash", `送出 ${card.n}`, `gave ${card.n}`, seat);
+        pay(s, o, card.n, seat);
+      }
+      return;
+    case "toEach":
+      for (const o of others) {
+        if (isOut(s, seat)) return;
+        ev(s, seat, "cash", `付 ${card.n}`, `paid ${card.n}`, o);
+        pay(s, seat, card.n, o);
+      }
+      return;
     case "repairs": {
-      const levels = s.houses.reduce((sum, h, i) => sum + (s.owner[i] === actor ? h : 0), 0);
+      const levels = s.houses.reduce((sum, h, i) => sum + (s.owner[i] === seat ? h : 0), 0);
       if (levels) {
-        ev(s, actor, "cash", `${levels} 层房，付 ${levels * card.n}`, `${levels} house levels: paid ${levels * card.n}`);
-        pay(s, actor, levels * card.n, null);
-      } else ev(s, actor, "cash", "没有房子，不用付", "no houses, nothing to pay");
+        ev(s, seat, "cash", `${levels} 层房，付 ${levels * card.n}`, `${levels} house levels: paid ${levels * card.n}`);
+        pay(s, seat, levels * card.n, null);
+      } else ev(s, seat, "cash", "没有房子，不用付", "no houses, nothing to pay");
       return;
     }
   }
 }
 
-function resolve(s: MonopolyState, actor: Actor) {
-  const i = s.players[actor].pos;
+function resolve(s: MonopolyState, seat: Seat) {
+  const i = s.players[seat]!.pos;
   const sp = space(i);
   switch (sp.kind) {
     case "property": {
       const owner = s.owner[i];
-      if (!owner) {
+      if (owner === null || owner === undefined) {
         s.phase = "buy";
         return;
       }
-      if (owner === actor) return;
+      if (owner === seat) return;
       const rent = monopolyRent(s, i);
-      ev(s, actor, "rent", `付租 ${rent}`, `paid rent ${rent} to the owner`);
-      return pay(s, actor, rent, owner);
+      ev(s, seat, "rent", `付租 ${rent}`, `paid rent ${rent}`, owner);
+      return pay(s, seat, rent, owner);
     }
     case "chance":
-      return drawCard(s, actor);
+      return drawCard(s, seat);
     case "tax":
-      ev(s, actor, "tax", sp.name === "税" ? `交税 ${sp.tax}` : `付${sp.name}钱 ${sp.tax}`, `paid ${sp.name} tax ${sp.tax}`);
-      return pay(s, actor, sp.tax!, null);
+      ev(s, seat, "tax", sp.name === "税" ? `交税 ${sp.tax}` : `付${sp.name}钱 ${sp.tax}`, `paid ${sp.name} tax ${sp.tax}`);
+      return pay(s, seat, sp.tax!, null);
     case "gotojail":
-      return sendToJail(s, actor);
+      return sendToJail(s, seat);
     default:
       return;
   }
@@ -379,32 +436,32 @@ function finishStep(s: MonopolyState) {
   s.phase = s.rollAgain ? "roll" : "end";
 }
 
-function doRoll(s: MonopolyState, actor: Actor) {
-  const p = s.players[actor];
+function doRoll(s: MonopolyState, seat: Seat) {
+  const p = s.players[seat]!;
   const d = rollDice(s);
   s.dice = d;
   const double = d[0] === d[1];
   const total = d[0] + d[1];
-  ev(s, actor, "roll", `掷出 ${d[0]}+${d[1]}`, `rolled ${d[0]}+${d[1]}${double ? " (double)" : ""}`);
+  ev(s, seat, "roll", `掷出 ${d[0]}+${d[1]}`, `rolled ${d[0]}+${d[1]}${double ? " (double)" : ""}`);
   s.phase = "roll";
   if (p.inJail) {
     s.rollAgain = false;
     if (double) {
       p.inJail = false;
       p.jailTries = 0;
-      ev(s, actor, "free", "对子，出狱", "rolled a double: out of jail");
-      moveForward(s, actor, total);
+      ev(s, seat, "free", "对子，出狱", "rolled a double: out of jail");
+      moveForward(s, seat, total);
     } else {
       p.jailTries++;
       if (p.jailTries >= 3) {
-        ev(s, actor, "free", `三次没掷出对子，交 ${MONOPOLY_JAIL_FINE} 出狱`, `third failed try: paid ${MONOPOLY_JAIL_FINE} and left jail`);
+        ev(s, seat, "free", `三次没掷出对子，交 ${MONOPOLY_JAIL_FINE} 出狱`, `third failed try: paid ${MONOPOLY_JAIL_FINE} and left jail`);
         p.inJail = false;
         p.jailTries = 0;
-        pay(s, actor, MONOPOLY_JAIL_FINE, null);
-        if (s.over) return;
-        moveForward(s, actor, total);
+        pay(s, seat, MONOPOLY_JAIL_FINE, null);
+        if (isOut(s, seat)) return;
+        moveForward(s, seat, total);
       } else {
-        ev(s, actor, "jail", `没掷出对子（第 ${p.jailTries} 次）`, `no double (try ${p.jailTries} of 3), still in jail`);
+        ev(s, seat, "jail", `没掷出对子（第 ${p.jailTries} 次）`, `no double (try ${p.jailTries} of 3), still in jail`);
         s.phase = "end";
         return;
       }
@@ -414,33 +471,45 @@ function doRoll(s: MonopolyState, actor: Actor) {
   if (double) {
     s.doubles++;
     if (s.doubles >= 3) {
-      ev(s, actor, "jail", "连掷三次对子", "third double in a row");
-      return sendToJail(s, actor);
+      ev(s, seat, "jail", "连掷三次对子", "third double in a row");
+      return sendToJail(s, seat);
     }
   }
   s.rollAgain = double;
-  moveForward(s, actor, total);
+  moveForward(s, seat, total);
   finishStep(s);
 }
 
 function finishByWorth(s: MonopolyState) {
-  const h = monopolyWorth(s, "human");
-  const a = monopolyWorth(s, "ai");
-  const winner: Actor | "draw" = h === a ? "draw" : h > a ? "human" : "ai";
-  const [hi, lo] = h >= a ? [h, a] : [a, h];
-  s.over = { winner, text: `身家 ${hi} : ${lo}` };
-  ev(s, s.turn, "over", `${s.rounds} 轮结束，身家 ${hi} : ${lo}`, `round limit reached: net worth ${hi} vs ${lo}`);
+  const seats = activeSeats(s);
+  const worth = seats.map((i) => monopolyWorth(s, i));
+  const best = Math.max(...worth);
+  const line = [...worth].sort((a, b) => b - a).join(" : ");
+  s.over = { winners: seats.filter((_, k) => worth[k] === best), text: `身家 ${line}` };
+  ev(s, s.turn, "over", `${s.rounds} 轮结束，身家 ${line}`, `round limit reached: net worth ${line}`);
 }
 
-function doEnd(s: MonopolyState) {
-  const actor = s.turn;
-  if (actor !== s.first) {
+/** Next seat still in the game after `seat`, in seat order. */
+function nextActive(s: MonopolyState, seat: Seat): Seat {
+  const n = s.players.length;
+  for (let k = 1; k <= n; k++) {
+    const i = (seat + k) % n;
+    if (!s.players[i]!.bankrupt) return i;
+  }
+  return seat;
+}
+
+/** Passes the turn on. Wrapping past the last seat ends a round (and maybe the game). */
+function endTurn(s: MonopolyState) {
+  const cur = s.turn;
+  const next = nextActive(s, cur);
+  if (next <= cur) {
     if (s.rounds > 0 && s.round >= s.rounds) finishByWorth(s);
     else s.round++;
   }
-  s.lastTurn = { actor, events: s.events };
+  s.past = [...s.past, { seat: cur, events: s.events }].slice(-4);
   s.events = [];
-  s.turn = otherActor(actor);
+  s.turn = next;
   s.phase = "roll";
   s.doubles = 0;
   s.rollAgain = false;
@@ -459,10 +528,7 @@ export function monopolySpaceIndex(text: string): number | null {
   return loose.length === 1 ? loose[0]!.index : null;
 }
 
-type Parsed =
-  | { k: "roll" | "buy" | "skip" | "pay" | "card" | "end" }
-  | { k: "build"; arg: string }
-  | { k: "bad" };
+type Parsed = { k: "roll" | "buy" | "skip" | "pay" | "card" | "end" } | { k: "build"; arg: string } | { k: "bad" };
 
 function parse(move: string): Parsed {
   const m = move.trim().toLowerCase().replace(/\s+/g, " ");
@@ -478,33 +544,71 @@ function parse(move: string): Parsed {
 }
 
 function phaseError(s: MonopolyState): string {
-  if (s.phase === "buy") return `先决定买不买${nameOf(s.players[s.turn].pos)}`;
+  if (s.phase === "buy") return `先决定买不买${nameOf(s.players[s.turn]!.pos)}`;
   if (s.phase === "roll") return s.rollAgain ? "掷出对子，要再掷一次" : "先掷骰子";
   return "这回合已经掷过了，可以结束回合";
 }
 
+const unownedCount = (s: MonopolyState) => MONOPOLY_SPACES.filter((sp) => sp.kind === "property" && s.owner[sp.index] === null).length;
+const isLate = (s: MonopolyState) => (s.rounds > 0 ? s.round > s.rounds * 0.6 : s.round > 30);
+
+/**
+ * Deterministic bot: buys while it keeps a cash reserve (200, 350 late) and always completes a group
+ * it can afford, builds on full groups while keeping 300, leaves jail with a card, pays early but
+ * sits and rolls for doubles late, and ends the turn when nothing else is useful.
+ */
+export function monopolyBot(s: MonopolyState, seat: Seat): string {
+  const legal = monopolyLegal(s);
+  const pick = (m: string) => (legal.includes(m) ? m : (legal[0] ?? "end"));
+  if (s.over || s.turn !== seat || !legal.length) return legal[0] ?? "end";
+  const p = s.players[seat]!;
+  const late = isLate(s);
+  if (s.phase === "buy") {
+    const sp = space(p.pos);
+    const completes = groupSpaces(sp.group!).every((i) => i === p.pos || s.owner[i] === seat);
+    const reserve = late ? 350 : 200;
+    if (legal.includes("buy") && (completes || p.cash - sp.price! >= reserve)) return "buy";
+    return pick("skip");
+  }
+  if (s.phase === "roll") {
+    if (p.inJail) {
+      if (legal.includes("card")) return "card";
+      const early = !late && unownedCount(s) >= 5;
+      if (early && legal.includes("pay") && p.cash >= MONOPOLY_JAIL_FINE + 200) return "pay";
+    }
+    return pick("roll");
+  }
+  const builds = buildOptions(s, seat)
+    .filter((b) => p.cash - b.cost >= 300)
+    .sort((a, b) => s.houses[a.index]! - s.houses[b.index]! || b.index - a.index);
+  if (builds.length) return pick(`build ${builds[0]!.index}`);
+  return pick("end");
+}
+
 const RULES = [
-  "大富翁, a two-player Monopoly-style dice game on a ring of 24 spaces (indices 0-23, clockwise).",
+  "大富翁, a Monopoly-style dice game for 2-4 players on a ring of 24 spaces (indices 0-23, clockwise).",
+  "Seat 0 moves first; turns go round in seat order, skipping bankrupt players. Tokens by seat: 墨 (ink), 乳 (milk), 灰 (grey), 朱 (milk with a red ring).",
   "Corners: 0 起点 (collect 200 whenever you pass or land on it), 6 拘留所 (jail / just visiting), 12 茶馆 (free rest), 18 去拘留所 (go straight to jail, no 200).",
-  "Spaces 3 and 15 are 命运 (chance: draw the top card of a shuffled 10-card deck, reshuffled when empty). 9 税 costs 100, 21 灯油 costs 50.",
+  "Spaces 3 and 15 are 命运 (chance: draw the top card of a shuffled 11-card deck, reshuffled when empty). 9 税 costs 100, 21 灯油 costs 50.",
   "The other 16 spaces are properties in 8 groups of 2 (G1 cheapest to G8 dearest, prices 60 to 400).",
-  "Both players start with 1500 on 起点. On your turn: roll two dice and move. Doubles let you roll again; a third double in a row sends you to jail instead of moving.",
-  "Landing on an unowned property: buy it at its price (if you can afford it) or skip (no auction). Landing on the opponent's property: pay rent automatically: base rent, doubled if the owner holds the whole group with no houses; with houses use the 1/2/3-level rent.",
-  "Chance cards: advance to 起点, forward 3, back 3, go to jail, get-out-of-jail card (kept), collect 100, pay 50, opponent gives you 50, pay 25 per house level, advance to 西窗 (13).",
+  "Everyone starts with 1500 on 起点. On your turn: roll two dice and move. Doubles let you roll again; a third double in a row sends you to jail instead of moving.",
+  "Landing on an unowned property: buy it at its price (if you can afford it) or skip (no auction). Landing on someone else's property: pay its owner rent automatically: base rent, doubled if the owner holds the whole group with no houses; with houses use the 1/2/3-level rent.",
+  "Chance cards: advance to 起点, forward 3, back 3, go to jail, get-out-of-jail card (kept), collect 100, pay 50, every other player gives you 50, pay every other player 25, pay 25 per house level, advance to 西窗 (13).",
   "Jail: going to jail ends your movement for the turn. On a later turn in jail you may pay 50 and then roll normally, use a get-out card and roll, or roll for doubles: a double frees you and you move (no extra roll); after the third failed try you must pay 50 and move by that roll.",
   "Building: during your turn (not while a buy decision is pending) you may add a house level to any property of a group you fully own: max 3 levels per property, cost per group (50 to 200). Building evenly is not required.",
   "Finish your turn with end once the roll is resolved; if you rolled a double you must roll again first.",
-  "If a payment makes your cash negative, house levels are sold automatically at half cost, then properties are returned to the bank at half price (cheapest first); if you are still negative you are bankrupt and lose.",
-  "Option rounds (20, 40 or 0 = unlimited): after that many full rounds, the higher net worth (cash + property prices + house costs) wins; equal is a draw.",
+  "If a payment makes your cash negative, house levels are sold automatically at half cost, then properties are returned to the bank at half price (cheapest first); if you are still negative you are bankrupt and out: your properties go back to the bank and you are skipped. The last player standing wins.",
+  "Option rounds (20, 40 or 0 = unlimited): after that many full rounds, the highest net worth (cash + property prices + house costs) wins; players tied for the highest all win.",
   "Moves: roll, buy, skip, build <space name or index> (e.g. build 夜雨 or build 7), pay (pay 50 to leave jail), card (use a get-out card), end.",
 ].join("\n");
 
-export const monopoly: LegacyGameModule<MonopolyState, MonopolyView> = {
+export const monopoly: GameModule<MonopolyState, MonopolyView> = {
   kind: "monopoly",
   name: { zh: "大富翁", en: "Monopoly" },
   family: "骰",
-  blurb: "掷骰子买地收租，让对方破产。",
+  blurb: "掷骰子买地收租，2 到 4 人，撑到最后。",
   ready: true,
+  players: { min: 2, max: 4, default: 3 },
   options: [
     {
       key: "rounds",
@@ -519,26 +623,24 @@ export const monopoly: LegacyGameModule<MonopolyState, MonopolyView> = {
   ],
   rules: RULES,
   moveHelp: '"roll", "buy", "skip", "build 夜雨" (or "build 7"), "pay" (leave jail for 50), "card" (get-out card), "end"',
-  create({ seed, humanFirst, options }) {
+  create({ seed, players, options }) {
     const [deck, rng] = shuffled(
       MONOPOLY_CARDS.map((c) => c.id),
       seed >>> 0,
     );
-    const player = (): MonopolyPlayer => ({ cash: MONOPOLY_START_CASH, pos: 0, inJail: false, jailTries: 0, cards: 0 });
-    const first: Actor = humanFirst ? "human" : "ai";
+    const n = Math.max(2, Math.min(4, players || 2));
     const rounds = Number(options.rounds ?? "20");
     return {
-      players: { human: player(), ai: player() },
+      players: Array.from({ length: n }, () => ({ cash: MONOPOLY_START_CASH, pos: 0, inJail: false, jailTries: 0, cards: 0, bankrupt: false })),
       owner: Array(N).fill(null),
       houses: Array(N).fill(0),
-      first,
-      turn: first,
+      turn: 0,
       phase: "roll",
       doubles: 0,
       rollAgain: false,
       dice: null,
       events: [],
-      lastTurn: null,
+      past: [],
       round: 1,
       rounds: Number.isFinite(rounds) && rounds > 0 ? rounds : 0,
       seq: 0,
@@ -546,34 +648,34 @@ export const monopoly: LegacyGameModule<MonopolyState, MonopolyView> = {
       deck,
     };
   },
-  apply(s0, actor, move) {
+  apply(s0, seat, move) {
     if (s0.over) return { ok: false, error: "对局已经结束" };
-    if (actor !== s0.turn) return { ok: false, error: "还没轮到你" };
+    if (seat !== s0.turn) return { ok: false, error: "还没轮到你" };
     const cmd = parse(move);
     const s = clone(s0);
-    const p = s.players[actor];
+    const p = s.players[seat]!;
     const before = s.events.length;
     switch (cmd.k) {
       case "bad":
         return { ok: false, error: `看不懂这步：${move}` };
       case "roll":
         if (s.phase !== "roll") return { ok: false, error: phaseError(s) };
-        doRoll(s, actor);
+        doRoll(s, seat);
         break;
       case "buy": {
         if (s.phase !== "buy") return { ok: false, error: "这里没有可买的地" };
         const sp = space(p.pos);
         if (p.cash < sp.price!) return { ok: false, error: `钱不够买${sp.name}` };
         p.cash -= sp.price!;
-        s.owner[p.pos] = actor;
-        ev(s, actor, "buy", `买下${sp.name}，花 ${sp.price}`, `bought ${sp.name} (${sp.index}) for ${sp.price}`);
+        s.owner[p.pos] = seat;
+        ev(s, seat, "buy", `买下${sp.name}，花 ${sp.price}`, `bought ${sp.name} (${sp.index}) for ${sp.price}`);
         s.phase = s.rollAgain ? "roll" : "end";
         break;
       }
       case "skip": {
         if (s.phase !== "buy") return { ok: false, error: "这里没有可买的地" };
         const sp = space(p.pos);
-        ev(s, actor, "skip", `不买${sp.name}`, `did not buy ${sp.name} (${sp.index})`);
+        ev(s, seat, "skip", `不买${sp.name}`, `did not buy ${sp.name} (${sp.index})`);
         s.phase = s.rollAgain ? "roll" : "end";
         break;
       }
@@ -584,7 +686,7 @@ export const monopoly: LegacyGameModule<MonopolyState, MonopolyView> = {
         p.cash -= MONOPOLY_JAIL_FINE;
         p.inJail = false;
         p.jailTries = 0;
-        ev(s, actor, "free", `交 ${MONOPOLY_JAIL_FINE} 出狱`, `paid ${MONOPOLY_JAIL_FINE} to leave jail`);
+        ev(s, seat, "free", `交 ${MONOPOLY_JAIL_FINE} 出狱`, `paid ${MONOPOLY_JAIL_FINE} to leave jail`);
         break;
       case "card":
         if (!p.inJail) return { ok: false, error: "你不在拘留所" };
@@ -593,7 +695,7 @@ export const monopoly: LegacyGameModule<MonopolyState, MonopolyView> = {
         p.cards--;
         p.inJail = false;
         p.jailTries = 0;
-        ev(s, actor, "free", "用出狱卡出狱", "used a get-out-of-jail card");
+        ev(s, seat, "free", "用出狱卡出狱", "used a get-out-of-jail card");
         break;
       case "build": {
         if (!cmd.arg) return { ok: false, error: "盖在哪里？比如 盖房 夜雨" };
@@ -602,41 +704,42 @@ export const monopoly: LegacyGameModule<MonopolyState, MonopolyView> = {
         const sp = space(i);
         if (sp.kind !== "property") return { ok: false, error: `${sp.name}不能盖房` };
         if (s.phase === "buy") return { ok: false, error: phaseError(s) };
-        if (s.owner[i] !== actor) return { ok: false, error: `${sp.name}不是你的` };
-        if (!monopolyOwnsGroup(s, actor, sp.group!)) return { ok: false, error: "要先凑齐一组才能盖房" };
+        if (s.owner[i] !== seat) return { ok: false, error: `${sp.name}不是你的` };
+        if (!monopolyOwnsGroup(s, seat, sp.group!)) return { ok: false, error: "要先凑齐一组才能盖房" };
         if (s.houses[i]! >= MONOPOLY_MAX_HOUSES) return { ok: false, error: `${sp.name}已经盖满三层` };
         if (p.cash < sp.houseCost!) return { ok: false, error: `钱不够盖房，要 ${sp.houseCost}` };
         p.cash -= sp.houseCost!;
         s.houses[i]!++;
-        ev(s, actor, "build", `在${sp.name}盖第 ${s.houses[i]} 层房，花 ${sp.houseCost}`, `built level ${s.houses[i]} on ${sp.name} (${i}) for ${sp.houseCost}`);
+        ev(s, seat, "build", `在${sp.name}盖第 ${s.houses[i]} 层房，花 ${sp.houseCost}`, `built level ${s.houses[i]} on ${sp.name} (${i}) for ${sp.houseCost}`);
         break;
       }
       case "end":
         if (s.phase !== "end") return { ok: false, error: phaseError(s) };
-        doEnd(s);
+        endTurn(s);
         s.seq++;
-        return { ok: true, state: s, log: s.over ? `结束回合，${s.lastTurn!.events.at(-1)!.zh}` : "结束回合" };
+        return { ok: true, state: s, log: s.over ? `结束回合，${s.past.at(-1)!.events.at(-1)!.zh}` : "结束回合" };
+    }
+    const fresh = s.events.slice(before);
+    // A player who went bankrupt on their own turn cannot end it: pass the turn on at once.
+    if (!s.over && s.players[s.turn]!.bankrupt) {
+      endTurn(s);
+      if (s.over) fresh.push(s.past.at(-1)!.events.at(-1)!);
     }
     s.seq++;
-    const log = s.events
-      .slice(before)
-      .map((e) => (e.actor === actor ? e.zh : `对方${e.zh}`))
-      .join("，");
+    const log = fresh.map((e) => `${e.seat === seat ? "" : monopolyToken(e.seat)}${monopolyEventZh(e, monopolyToken)}`).join("，");
     return { ok: true, state: s, log: log || move };
   },
   waitingOn(s) {
     return s.over ? [] : [s.turn];
   },
   outcome(s) {
-    return s.over ?? null;
+    return s.over ? { winners: [...s.over.winners], text: s.over.text } : null;
   },
-  seats(s) {
-    return s.first === "human" ? { human: "先手", ai: "后手" } : { human: "后手", ai: "先手" };
+  seatLabels(s) {
+    return s.players.map((p, i) => (p.bankrupt ? `${monopolyToken(i)}·出局` : monopolyToken(i)));
   },
   view(s, viewer) {
-    const seats = monopoly.seats(s);
-    const pv = (a: Actor): MonopolyPlayerView => ({ ...s.players[a], worth: monopolyWorth(s, a), seat: seats[a], ink: a === s.first });
-    const cur = s.players[s.turn];
+    const cur = s.players[s.turn]!;
     return {
       me: viewer,
       spaces: MONOPOLY_SPACES.map((sp) => ({
@@ -644,40 +747,54 @@ export const monopoly: LegacyGameModule<MonopolyState, MonopolyView> = {
         rent: sp.rent ? [...sp.rent] : undefined,
         owner: s.owner[sp.index] ?? null,
         houses: s.houses[sp.index] ?? 0,
-        rentNow: sp.kind === "property" ? (s.owner[sp.index] ? monopolyRent(s, sp.index) : sp.rent![0]) : undefined,
+        rentNow: sp.kind === "property" ? (s.owner[sp.index] !== null ? monopolyRent(s, sp.index) : sp.rent![0]) : undefined,
       })) as MonopolySpaceView[],
-      players: { human: pv("human"), ai: pv("ai") },
-      first: s.first,
+      players: s.players.map((p, i) => ({
+        ...p,
+        seat: i,
+        token: monopolyToken(i),
+        worth: monopolyWorth(s, i),
+        props: s.owner.filter((o) => o === i).length,
+      })),
       turn: s.turn,
       phase: s.phase,
       doubles: s.doubles,
       rollAgain: s.rollAgain,
       dice: s.dice ? [s.dice[0], s.dice[1]] : null,
       events: clone(s.events),
-      lastTurn: clone(s.lastTurn),
+      past: clone(s.past),
+      lastTurn: s.past.length ? clone(s.past.at(-1)!) : null,
       round: s.round,
       rounds: s.rounds,
       seq: s.seq,
       deckLeft: s.deck.length,
-      over: s.over ? { ...s.over } : null,
+      over: s.over ? { winners: [...s.over.winners], text: s.over.text } : null,
       legal: monopolyLegal(s),
       buildable: canBuildNow(s) ? buildOptions(s, s.turn) : [],
       offer: s.phase === "buy" && !s.over ? { index: cur.pos, price: space(cur.pos).price! } : null,
     };
   },
-  describe(s, names) {
-    const who = (a: Actor | null) => (a === null ? "-" : a === "ai" ? "you" : names.human);
+  describe(s, seat, names) {
+    const who = (i: Seat | null) => (i === null ? "-" : i === seat ? "you" : (names[i] ?? `seat ${i}`));
+    const Who = (i: Seat) => (i === seat ? "You" : (names[i] ?? `seat ${i}`));
+    const n = s.players.length;
     const out: string[] = [];
-    out.push(`Round ${s.round}${s.rounds ? ` of ${s.rounds}` : " (no round limit)"}. ${s.first === "ai" ? "You move" : `${names.human} moves`} first each round.`);
+    out.push(
+      `Round ${s.round}${s.rounds ? ` of ${s.rounds}` : " (no round limit)"}. ${n} players; turns go in seat order from seat 0. You are seat ${seat} (token ${monopolyToken(seat)}).`,
+    );
     out.push("", "Board (idx name | type | price | house cost | rent base/1/2/3 | owner | houses | rent now):");
     for (const sp of MONOPOLY_SPACES) {
       const i = sp.index;
-      const tokens = (["ai", "human"] as Actor[]).filter((a) => s.players[a].pos === i).map((a) => (a === "ai" ? "YOU" : names.human.toUpperCase()));
+      const tokens = s.players
+        .map((p, k) => ({ p, k }))
+        .filter(({ p }) => !p.bankrupt && p.pos === i)
+        .sort((a, b) => (a.k === seat ? -1 : b.k === seat ? 1 : a.k - b.k))
+        .map(({ k }) => (k === seat ? "YOU" : (names[k] ?? `seat ${k}`).toUpperCase()));
       const here = tokens.length ? `  <- ${tokens.join(", ")}` : "";
       if (sp.kind === "property") {
         const o = s.owner[i] ?? null;
         out.push(
-          `${String(i).padStart(2)} ${sp.name} | G${sp.group! + 1} | ${sp.price} | ${sp.houseCost} | ${sp.rent!.join("/")} | ${who(o)} | ${s.houses[i]} | ${o ? monopolyRent(s, i) : "-"}${here}`,
+          `${String(i).padStart(2)} ${sp.name} | G${sp.group! + 1} | ${sp.price} | ${sp.houseCost} | ${sp.rent!.join("/")} | ${who(o)} | ${s.houses[i]} | ${o !== null ? monopolyRent(s, i) : "-"}${here}`,
         );
       } else {
         const what: Record<string, string> = {
@@ -691,38 +808,46 @@ export const monopoly: LegacyGameModule<MonopolyState, MonopolyView> = {
         out.push(`${String(i).padStart(2)} ${sp.name} | ${what[sp.kind]}${here}`);
       }
     }
-    const player = (a: Actor) => {
-      const p = s.players[a];
+    const player = (a: Seat) => {
+      const p = s.players[a]!;
+      const tag = `${Who(a)} (seat ${a}, ${monopolyToken(a)})`;
+      if (p.bankrupt) return `${tag}: BANKRUPT, out of the game.`;
       const props = MONOPOLY_SPACES.filter((sp) => s.owner[sp.index] === a).map((sp) => {
         const full = monopolyOwnsGroup(s, a, sp.group!);
         return `${sp.name}(${sp.index}, G${sp.group! + 1}${full ? ", full group" : ""}${s.houses[sp.index] ? `, ${s.houses[sp.index]} houses` : ""})`;
       });
-      const label = a === "ai" ? "You" : names.human;
       const jail = p.inJail ? `IN JAIL (failed tries ${p.jailTries}/3)` : "not in jail";
-      return `${label}: cash ${p.cash}, at ${p.pos} ${nameOf(p.pos)}, net worth ${monopolyWorth(s, a)}, ${jail}, get-out cards ${p.cards}. Properties: ${props.join(", ") || "none"}.`;
+      return `${tag}: cash ${p.cash}, at ${p.pos} ${nameOf(p.pos)}, net worth ${monopolyWorth(s, a)}, ${jail}, get-out cards ${p.cards}. Properties: ${props.join(", ") || "none"}.`;
     };
-    out.push("", player("ai"), player("human"));
-    const evLine = (list: MonopolyEvent[]) => list.map((e) => (e.actor === "ai" ? e.en : `${names.human} ${e.en}`)).join("; ");
-    if (s.lastTurn?.events.length) out.push("", `Previous turn (${who(s.lastTurn.actor)}): ${evLine(s.lastTurn.events)}.`);
-    if (s.events.length) out.push(`This turn (${who(s.turn)}): ${evLine(s.events)}.`);
+    out.push("", "Players:", player(seat), ...s.players.map((_, i) => i).filter((i) => i !== seat).map(player));
+    const evLine = (list: MonopolyEvent[], turnSeat: Seat) =>
+      list.map((e) => `${e.seat === turnSeat ? "" : `${Who(e.seat)} `}${eventEn(e, who)}`).join("; ");
+    const past = s.past.slice(-(n - 1 || 1));
+    if (past.length) {
+      out.push("");
+      for (const t of past) if (t.events.length) out.push(`${t === s.past.at(-1) ? "Previous turn" : "Earlier turn"} (${who(t.seat)}): ${evLine(t.events, t.seat)}.`);
+    }
+    if (s.events.length) out.push(`This turn (${who(s.turn)}): ${evLine(s.events, s.turn)}.`);
     if (s.dice) out.push(`Last dice: ${s.dice[0]}+${s.dice[1]}.`);
     if (s.over) {
-      out.push("", `Game over: ${s.over.winner === "draw" ? "draw" : `${who(s.over.winner)} won`} (${s.over.text}).`);
+      const w = s.over.winners;
+      out.push("", `Game over: ${w.length ? `${w.map(who).join(", ")} won` : "draw"} (${s.over.text}).`);
       return out.join("\n");
     }
+    const cur = s.players[s.turn]!;
     const phaseText =
       s.phase === "buy"
-        ? `deciding whether to buy ${nameOf(s.players[s.turn].pos)}`
+        ? `deciding whether to buy ${nameOf(cur.pos)}`
         : s.phase === "roll"
           ? s.rollAgain
             ? "rolled a double, must roll again"
-            : s.players[s.turn].inJail
+            : cur.inJail
               ? "in jail, about to roll / pay / use a card"
               : "about to roll"
           : "roll resolved; may build, then end the turn";
-    out.push("", `Turn: ${s.turn === "ai" ? "YOURS" : names.human}. Phase: ${phaseText}.`);
-    if (s.turn === "ai") {
-      const p = s.players.ai;
+    out.push("", `Turn: ${s.turn === seat ? "YOURS" : who(s.turn)}. Phase: ${phaseText}.`);
+    if (s.turn === seat) {
+      const p = cur;
       const moves = monopolyLegal(s).map((m) => {
         if (m === "roll") return p.inJail ? `roll (try for doubles, try ${p.jailTries + 1} of 3)` : "roll";
         if (m === "buy") {
@@ -742,8 +867,8 @@ export const monopoly: LegacyGameModule<MonopolyState, MonopolyView> = {
       });
       if (s.phase === "buy" && p.cash < space(p.pos).price!) moves.push(`(cannot buy ${nameOf(p.pos)}: costs ${space(p.pos).price}, you have ${p.cash})`);
       out.push(`Legal moves: ${moves.join(" | ")}`);
-    } else out.push(`Waiting for ${names.human}.`);
+    } else out.push(`Waiting for ${who(s.turn)}.`);
     return out.join("\n");
   },
+  bot: monopolyBot,
 };
-

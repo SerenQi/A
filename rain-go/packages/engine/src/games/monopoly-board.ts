@@ -79,7 +79,7 @@ export const MONOPOLY_SPACES: MonopolySpace[] = [
   P(23, "长安", 7),
 ];
 
-export type MonopolyCardKind = "goto" | "forward" | "back" | "jail" | "jailfree" | "collect" | "pay" | "fromOpponent" | "repairs";
+export type MonopolyCardKind = "goto" | "forward" | "back" | "jail" | "jailfree" | "collect" | "pay" | "fromEach" | "toEach" | "repairs";
 
 export interface MonopolyCard {
   id: number;
@@ -98,11 +98,15 @@ export const MONOPOLY_CARDS: MonopolyCard[] = [
   { id: 4, kind: "jailfree", n: 0, zh: "得到一张出狱卡", en: "Get-out-of-jail card (kept until used)" },
   { id: 5, kind: "collect", n: 100, zh: "卖出一幅雨景，收 100", en: "Sold a rain painting: collect 100" },
   { id: 6, kind: "pay", n: 50, zh: "修补漏雨的窗，付 50", en: "Mend a leaking window: pay 50" },
-  { id: 7, kind: "fromOpponent", n: 50, zh: "故人来访，对方送你 50", en: "An old friend visits: the opponent gives you 50" },
+  { id: 7, kind: "fromEach", n: 50, zh: "故人来访，每位玩家送你 50", en: "Old friends visit: every other player gives you 50" },
   { id: 8, kind: "repairs", n: MONOPOLY_REPAIR_PER_LEVEL, zh: "屋漏逢雨，每层房付 25", en: "Leaky roofs: pay 25 per house level you own" },
   { id: 9, kind: "goto", n: 13, zh: "去西窗剪烛", en: "Advance to 西窗 (collect 200 if you pass 起点)" },
+  { id: 10, kind: "toEach", n: 25, zh: "请大家喝茶，付给每位玩家 25", en: "Tea for the table: pay every other player 25" },
 ];
 export const MONOPOLY_JAILFREE_CARD = 4;
+
+/** Token names by seat, matching the UI discs: ink, milk, soft grey, milk with an accent ring. */
+export const MONOPOLY_TOKENS = ["墨", "乳", "灰", "朱"] as const;
 
 /** Row and column (0-6) of a space on the 7x7 ring. 起点 is bottom right; play runs clockwise. */
 export function monopolyCell(index: number): { row: number; col: number } {
