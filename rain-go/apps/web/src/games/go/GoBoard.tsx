@@ -1,4 +1,5 @@
 import { COLUMNS, EMPTY, other, starPoints, step, type Chain, type Color, type GameState } from "@rain-go/engine";
+import { DropDefs } from "../../components/drops";
 import { useMemo, useRef, useState, type PointerEvent, type ReactElement } from "react";
 
 const BEAD_R = 0.41;
@@ -190,25 +191,7 @@ export function Board(p: BoardProps) {
       role="grid"
       aria-label={`${size} by ${size} Go board`}
     >
-      <defs>
-        <filter id="goo" x="-5%" y="-5%" width="110%" height="110%">
-          <feGaussianBlur stdDeviation="0.09" />
-          <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9" />
-        </filter>
-        <filter id="drop-shadow" x="-5%" y="-5%" width="110%" height="115%">
-          <feDropShadow dx="0.04" dy="0.09" stdDeviation="0.07" floodOpacity="0.28" />
-        </filter>
-        <radialGradient id="ink" cx="35%" cy="30%" r="80%">
-          <stop offset="0" stopColor="#3a3a3a" />
-          <stop offset="0.55" stopColor="#0b0b0b" />
-          <stop offset="1" stopColor="#000" />
-        </radialGradient>
-        <radialGradient id="milk" cx="35%" cy="30%" r="80%">
-          <stop offset="0" stopColor="#ffffff" />
-          <stop offset="0.7" stopColor="#ecece8" />
-          <stop offset="1" stopColor="#c9c9c4" />
-        </radialGradient>
-      </defs>
+      <DropDefs />
 
       <rect
         x={-PAD + 0.25}

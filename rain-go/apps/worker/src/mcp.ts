@@ -1,90 +1,107 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { CfWorkerJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/cfworker";
-import { describeForAi, fromGtp, type Action, type GameRecord } from "@rain-go/engine";
+import { GAMES, describeMatch, readyGames, type Match, type MatchAction } from "@rain-go/engine";
 import { z } from "zod";
 import { isGameId, lobbyOf, newGameId, roomOf, type Env } from "./env";
 
-const INSTRUCTIONS = `West Window (西窗): play Go against a human on a shared board. On the human's screen stones look like water drops on a rainy window; connected stones of one color merge into one drop.
+const INSTRUCTIONS = `West Window (西窗): play board, card and dice games against a human who watches a live page on their phone.
 
 Flow:
-1. go_new_game (or go_list_games to find one). Share the board link with the human.
-2. When it is your turn call go_play with a GTP coordinate like "D4", or "pass".
-3. Otherwise call go_wait_for_opponent. It blocks up to ~50s; call it again if it times out.
-4. After two passes the game enters scoring: mark dead chains with go_scoring toggle_dead, then accept. Either side may resume play instead.
-Rules: Chinese area scoring, positional superko, suicide forbidden. Board text uses X for black, O for white, + for star points, lowercase for stones marked dead.
-You may talk to the human with the "say" argument of go_play or with go_say. Keep it short and warm.
-Either side's display name can be changed at any time with go_rename, for example when the human asks you to call them something else.`;
+1. list_game_types to see what can be played and each game's rules, then new_game. Share the returned link with the human.
+2. When it is your turn call play with a move in that game's syntax (every state tells you the syntax).
+3. Otherwise call wait_for_opponent. It blocks up to ~50s; call it again if it times out.
+4. get_state shows the table at any time. Card games only show you your own hand.
+You may talk to the human with the "say" argument of play or with say. Keep it short and warm.
+Either side's display name can be changed at any time with rename.`;
 
 const text = (t: string, isError = false) => ({ content: [{ type: "text" as const, text: t }], isError });
 
 export function buildMcpServer(env: Env, origin: string): McpServer {
   const server = new McpServer(
-    { name: "rain-go", version: "0.1.0" },
+    { name: "rain-go", version: "0.2.0" },
     { instructions: INSTRUCTIONS, jsonSchemaValidator: new CfWorkerJsonSchemaValidator() },
   );
   const urlOf = (id: string) => `${origin}/g/${id}`;
+  const readyKinds = readyGames().map((g) => g.kind) as [string, ...string[]];
 
-  const resolveGame = async (gameId?: string): Promise<{ id: string; record: GameRecord } | { error: string }> => {
+  const resolveGame = async (gameId?: string): Promise<{ id: string; match: Match } | { error: string }> => {
     let id = gameId?.trim();
     if (!id) {
       const [latest] = await lobbyOf(env).list(1, false);
-      if (!latest) return { error: "No active game. Start one with go_new_game." };
+      if (!latest) return { error: "No active game. Start one with new_game." };
       id = latest.id;
     }
     if (!isGameId(id)) return { error: `Invalid game id "${id}".` };
-    const record = await roomOf(env, id).get();
-    if (!record) return { error: `Game ${id} not found.` };
-    return { id, record };
+    const match = await roomOf(env, id).get();
+    if (!match) return { error: `Game ${id} not found.` };
+    return { id, match };
   };
 
-  const gameIdArg = z
-    .string()
-    .optional()
-    .describe("Game id. Omit to use the most recently active unfinished game.");
+  const gameIdArg = z.string().optional().describe("Game id. Omit to use the most recently active unfinished game.");
 
-  const act = async (gameId: string | undefined, actions: Action[]) => {
+  const act = async (gameId: string | undefined, actions: MatchAction[]) => {
     const g = await resolveGame(gameId);
     if ("error" in g) return text(g.error, true);
-    let record = g.record;
+    let match = g.match;
     for (const a of actions) {
       const res = await roomOf(env, g.id).act("ai", a);
-      if (!res.ok) return text(`Not allowed: ${res.message}\n\n${describeForAi(record, urlOf(g.id))}`, true);
-      record = res.record;
+      if (!res.ok) return text(`Not allowed: ${res.message}\n\n${describeMatch(match, urlOf(g.id))}`, true);
+      match = res.match;
     }
-    return text(describeForAi(record, urlOf(g.id)));
+    return text(describeMatch(match, urlOf(g.id)));
   };
 
   server.registerTool(
-    "go_new_game",
+    "list_game_types",
     {
-      title: "Start a new game",
-      description: "Create a new Go game against the human. Returns the game id and a board link to give to the human.",
-      inputSchema: {
-        size: z.union([z.literal(9), z.literal(13), z.literal(19)]).default(9).describe("Board size."),
-        ai_color: z.enum(["black", "white"]).default("white").describe("Your color. Black moves first."),
-        komi: z.number().min(-50).max(50).default(7.5).describe("Points given to white."),
-        human_name: z.string().max(40).optional().describe("How to call the human player."),
-        ai_name: z.string().max(40).optional().describe("Your display name on the board."),
-      },
+      title: "List game types",
+      description: "List the games you can start, with options and full rules.",
+      inputSchema: {},
+      annotations: { readOnlyHint: true },
     },
-    async ({ size, ai_color, komi, human_name, ai_name }) => {
-      const id = newGameId();
-      const record = await roomOf(env, id).create({
-        id,
-        size,
-        komi,
-        humanColor: ai_color === "white" ? 1 : 2,
-        humanName: human_name,
-        aiName: ai_name,
-        now: Date.now(),
+    async () => {
+      const lines = readyGames().map((g) => {
+        const opts = g.options.length
+          ? ` Options: ${g.options.map((o) => `${o.key} = ${o.choices.map((c) => c.value).join(" | ")} (default ${o.default})`).join("; ")}.`
+          : "";
+        return `## ${g.kind} · ${g.name.en} (${g.name.zh})\n${g.rules}${opts}\nMove syntax: ${g.moveHelp}`;
       });
-      return text(`New game created. Send the human this link: ${urlOf(id)}\n\n${describeForAi(record, urlOf(id))}`);
+      return text(lines.join("\n\n"));
     },
   );
 
   server.registerTool(
-    "go_list_games",
+    "new_game",
+    {
+      title: "Start a new game",
+      description: "Create a game against the human and get a link for them. See list_game_types for kinds and options.",
+      inputSchema: {
+        kind: z.enum(readyKinds).describe(`Game type: ${readyKinds.join(", ")}.`),
+        options: z.record(z.string(), z.string()).optional().describe('Game options, e.g. {"size": "13"} for go.'),
+        human_first: z.boolean().default(true).describe("True: the human takes the first seat (black / white in chess / red in xiangqi / acts first)."),
+        human_name: z.string().max(40).optional(),
+        ai_name: z.string().max(40).optional().describe("Your display name."),
+      },
+    },
+    async ({ kind, options, human_first, human_name, ai_name }) => {
+      const id = newGameId();
+      const match = await roomOf(env, id).create({
+        id,
+        kind: kind as Match["kind"],
+        options,
+        humanFirst: human_first,
+        humanName: human_name,
+        aiName: ai_name,
+        seed: crypto.getRandomValues(new Uint32Array(1))[0]!,
+        now: Date.now(),
+      });
+      return text(`New game created. Send the human this link: ${urlOf(id)}\n\nRules: ${GAMES[match.kind].rules}\n\n${describeMatch(match, urlOf(id))}`);
+    },
+  );
+
+  server.registerTool(
+    "list_games",
     {
       title: "List games",
       description: "List recent games with their status.",
@@ -93,124 +110,84 @@ export function buildMcpServer(env: Env, origin: string): McpServer {
     },
     async ({ include_finished }) => {
       const games = await lobbyOf(env).list(20, include_finished);
-      if (!games.length) return text("No games yet. Start one with go_new_game.");
-      const lines = games.map(
-        (g) =>
-          `- ${g.id} · ${g.size}x${g.size} · ${g.phase}${g.result ? ` (${g.result})` : ""} · ${g.moves} moves · waiting on ${
-            g.waitingOn.join(" & ") || "nobody"
-          } · vs ${g.humanName} · ${urlOf(g.id)}`,
+      if (!games.length) return text("No games yet. Start one with new_game.");
+      return text(
+        games
+          .map(
+            (g) =>
+              `- ${g.id} · ${GAMES[g.kind].name.en} · ${g.result ?? (g.waitingOn.includes("ai") ? "your turn" : `waiting on ${g.humanName}`)} · ${g.moves} moves · ${urlOf(g.id)}`,
+          )
+          .join("\n"),
       );
-      return text(lines.join("\n"));
     },
   );
 
   server.registerTool(
-    "go_get_board",
+    "get_state",
     {
-      title: "Show the board",
-      description: "Show the current board, whose turn it is, chains in danger, and recent messages.",
+      title: "Show the game",
+      description: "Show the board or table as you may see it, whose turn it is, and recent messages.",
       inputSchema: { game_id: gameIdArg },
       annotations: { readOnlyHint: true },
     },
     async ({ game_id }) => {
       const g = await resolveGame(game_id);
       if ("error" in g) return text(g.error, true);
-      return text(describeForAi(g.record, urlOf(g.id)));
+      return text(describeMatch(g.match, urlOf(g.id)));
     },
   );
 
   server.registerTool(
-    "go_play",
+    "play",
     {
-      title: "Play a move",
-      description: 'Play your move: a GTP coordinate such as "D4" (columns skip I, row 1 is the bottom) or "pass". Optionally say something to the human.',
+      title: "Make a move",
+      description: "Make your move in the game's move syntax (shown in every state). Optionally say something to the human.",
       inputSchema: {
         game_id: gameIdArg,
-        move: z.string().describe('GTP coordinate like "D4", or "pass".'),
+        move: z.string().min(1).describe('The move, e.g. "D4", "e2e4", "call", "roll".'),
         say: z.string().max(280).optional().describe("A short message shown to the human next to your move."),
       },
     },
     async ({ game_id, move, say }) => {
-      const g = await resolveGame(game_id);
-      if ("error" in g) return text(g.error, true);
-      const actions: Action[] = [];
-      if (move.trim().toLowerCase() === "pass") actions.push({ type: "pass" });
-      else {
-        const point = fromGtp(move, g.record.size);
-        if (point === null) return text(`"${move}" is not a coordinate on a ${g.record.size}x${g.record.size} board.`, true);
-        actions.push({ type: "play", point });
-      }
+      const actions: MatchAction[] = [{ type: "move", move }];
       if (say?.trim()) actions.push({ type: "say", text: say });
-      return act(g.id, actions);
+      return act(game_id, actions);
     },
   );
 
   server.registerTool(
-    "go_wait_for_opponent",
+    "wait_for_opponent",
     {
       title: "Wait for the human",
-      description:
-        "Block until the human has moved (or scoring needs your decision, or the game ends). Returns the board. If it says it timed out, call it again.",
-      inputSchema: {
-        game_id: gameIdArg,
-        timeout_seconds: z.number().int().min(1).max(55).default(50),
-      },
+      description: "Block until it is your turn again or the game ends. Returns the state. If it says it timed out, call it again.",
+      inputSchema: { game_id: gameIdArg, timeout_seconds: z.number().int().min(1).max(55).default(50) },
       annotations: { readOnlyHint: true },
     },
     async ({ game_id, timeout_seconds }) => {
       const g = await resolveGame(game_id);
       if ("error" in g) return text(g.error, true);
-      const { record, timedOut } = await roomOf(env, g.id).waitFor("ai", timeout_seconds * 1000);
-      if (!record) return text("Game disappeared.", true);
-      const head = timedOut ? "Still waiting for the human (timed out). Call go_wait_for_opponent again.\n\n" : "";
-      return text(head + describeForAi(record, urlOf(g.id)));
+      const { match, timedOut } = await roomOf(env, g.id).waitFor("ai", timeout_seconds * 1000);
+      if (!match) return text("Game disappeared.", true);
+      const head = timedOut ? "Still waiting for the human (timed out). Call wait_for_opponent again.\n\n" : "";
+      return text(head + describeMatch(match, urlOf(g.id)));
     },
   );
 
   server.registerTool(
-    "go_scoring",
-    {
-      title: "Scoring decisions",
-      description:
-        "During scoring: toggle_dead marks or unmarks the whole chain at a point as dead; accept agrees to the current marking; resume goes back to playing.",
-      inputSchema: {
-        game_id: gameIdArg,
-        action: z.enum(["toggle_dead", "accept", "resume"]),
-        point: z.string().optional().describe('For toggle_dead: any stone of the chain, e.g. "C3".'),
-      },
-    },
-    async ({ game_id, action, point }) => {
-      const g = await resolveGame(game_id);
-      if ("error" in g) return text(g.error, true);
-      if (action === "toggle_dead") {
-        const p = point ? fromGtp(point, g.record.size) : null;
-        if (p === null) return text("toggle_dead needs a valid point.", true);
-        return act(g.id, [{ type: "toggle_dead", point: p }]);
-      }
-      return act(g.id, [{ type: action }]);
-    },
-  );
-
-  server.registerTool(
-    "go_resign",
-    {
-      title: "Resign",
-      description: "Resign the game.",
-      inputSchema: { game_id: gameIdArg },
-      annotations: { destructiveHint: true },
-    },
+    "resign",
+    { title: "Resign", description: "Resign the game.", inputSchema: { game_id: gameIdArg }, annotations: { destructiveHint: true } },
     async ({ game_id }) => act(game_id, [{ type: "resign" }]),
   );
 
   server.registerTool(
-    "go_rename",
+    "rename",
     {
       title: "Rename players",
-      description: "Change the display name of the human, of yourself, or both. The board page updates at once.",
+      description: "Change the display name of the human, of yourself, or both. The page updates at once.",
       inputSchema: {
         game_id: gameIdArg,
-        human_name: z.string().min(1).max(40).optional().describe("New name for the human."),
-        ai_name: z.string().min(1).max(40).optional().describe("New name for you."),
+        human_name: z.string().min(1).max(40).optional(),
+        ai_name: z.string().min(1).max(40).optional(),
       },
     },
     async ({ game_id, human_name, ai_name }) => {
@@ -220,10 +197,10 @@ export function buildMcpServer(env: Env, origin: string): McpServer {
   );
 
   server.registerTool(
-    "go_say",
+    "say",
     {
       title: "Say something",
-      description: "Send a short message to the human; it appears on the board page.",
+      description: "Send a short message to the human; it appears on their page.",
       inputSchema: { game_id: gameIdArg, text: z.string().min(1).max(280) },
     },
     async ({ game_id, text: t }) => act(game_id, [{ type: "say", text: t }]),

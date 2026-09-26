@@ -3,7 +3,8 @@ import { areaScore } from "./score";
 import { ILLEGAL_TEXT, replay, step, type GameState, type Phase } from "./state";
 import { EMPTY, colorName, other, SUPPORTED_SIZES, type Color, type GameRecord, type MoveRecord } from "./types";
 
-export type Actor = "human" | "ai";
+import type { Actor } from "./match/types";
+export type { Actor };
 
 export type Action =
   | { type: "play"; point: number }

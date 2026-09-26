@@ -3,8 +3,6 @@ import { useState } from "react";
 import { prefs } from "../api";
 import { IconSwap } from "./icons";
 
-const colorZh = (c: 1 | 2) => (c === 1 ? "黑" : "白");
-
 /** Recent names as tappable chips; tapping fills the active field. */
 export function NameChips({ exclude, onPick }: { exclude: string[]; onPick: (n: string) => void }) {
   const [names, setNames] = useState(() => prefs.recentNames());
@@ -37,13 +35,15 @@ export function NameChips({ exclude, onPick }: { exclude: string[]; onPick: (n: 
 export function NameSheet({
   humanName,
   aiName,
-  humanColor,
+  humanSeat,
+  aiSeat,
   onSave,
   onClose,
 }: {
   humanName: string;
   aiName: string;
-  humanColor: 1 | 2;
+  humanSeat: string;
+  aiSeat: string;
   onSave: (human: string, ai: string) => Promise<boolean>;
   onClose: () => void;
 }) {
@@ -51,13 +51,12 @@ export function NameSheet({
   const [ai, setAi] = useState(aiName);
   const [active, setActive] = useState<"human" | "ai">("human");
   const [busy, setBusy] = useState(false);
-  const aiColor = humanColor === 1 ? 2 : 1;
   const valid = human.trim() && ai.trim();
 
   const field = (who: "human" | "ai") => (
     <label className="block">
       <span className="text-sm text-muted">
-        {who === "human" ? `你 · 执${colorZh(humanColor)}` : `AI · 执${colorZh(aiColor)}`}
+        {who === "human" ? `你 · ${humanSeat}` : `AI · ${aiSeat}`}
       </span>
       <input
         className={`field mt-1 !min-h-[44px] ${active === who ? "!border-black/35" : ""}`}

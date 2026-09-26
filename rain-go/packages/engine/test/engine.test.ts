@@ -3,7 +3,7 @@ import {
   applyAction,
   areaScore,
   createRecord,
-  describeForAi,
+  describeGo,
   findChains,
   fromGtp,
   replay,
@@ -195,7 +195,7 @@ describe("record actions", () => {
     const res = applyAction(r, "human", { type: "play", point: pt(2, 6) }, 1);
     if (!res.ok) throw new Error();
     r = res.record;
-    const text = describeForAi(r);
+    const text = describeGo(r);
     expect(text).toContain("You play white (O)");
     expect(text).toContain("Last: black C3.");
     expect(text).toContain("that's YOU");

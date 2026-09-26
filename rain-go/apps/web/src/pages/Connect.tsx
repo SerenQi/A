@@ -9,15 +9,15 @@ import { useToast } from "../components/Toast";
 const card = { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.35 } };
 
 const TOOLS: [string, string][] = [
-  ["go_new_game", "开新局，返回棋盘链接"],
-  ["go_list_games", "列出对局"],
-  ["go_get_board", "看当前盘面、谁该下、哪块棋危险"],
-  ["go_play", "落子或停一手，可以顺便说一句话"],
-  ["go_wait_for_opponent", "挂起等你落子，最长约 50 秒"],
-  ["go_scoring", "数子阶段：标记死子、接受、继续下"],
-  ["go_resign", "认输"],
-  ["go_rename", "改你或 AI 的名字"],
-  ["go_say", "给你发一句悄悄话"],
+  ["list_game_types", "有哪些游戏、规则和选项"],
+  ["new_game", "开新局，返回链接"],
+  ["list_games", "列出对局"],
+  ["get_state", "看棋盘或牌桌、轮到谁"],
+  ["play", "走一步，可以顺便说一句话"],
+  ["wait_for_opponent", "挂起等你，最长约 50 秒"],
+  ["resign", "认输"],
+  ["rename", "改你或 AI 的名字"],
+  ["say", "给你发一句悄悄话"],
 ];
 
 export function Connect() {
@@ -75,7 +75,7 @@ export function Connect() {
                 {cmd}
               </code>
             </li>
-            <li className="stat-bar">然后对 AI 说：「我们来下一盘围棋吧」。它会开局，把棋盘链接发给你。</li>
+            <li className="stat-bar">然后对 AI 说：「我们来玩一局五子棋吧」。它会开局，把链接发给你。</li>
           </ol>
         </motion.section>
 

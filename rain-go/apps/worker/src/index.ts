@@ -1,4 +1,4 @@
-import { SUPPORTED_SIZES, parseColor, type Action } from "@rain-go/engine";
+import { GAMES, isGameKind, viewMatch, type MatchAction } from "@rain-go/engine";
 import { Hono } from "hono";
 import { authorized, isGameId, lobbyOf, newGameId, roomOf, type Env } from "./env";
 import { handleMcp } from "./mcp";
@@ -10,7 +10,7 @@ const app = new Hono<{ Bindings: Env }>();
 
 const unauthorized = () => new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { "content-type": "application/json" } });
 
-app.get("/api/config", (c) => c.json({ authRequired: Boolean(c.env.ACCESS_TOKEN), sizes: SUPPORTED_SIZES }));
+app.get("/api/config", (c) => c.json({ authRequired: Boolean(c.env.ACCESS_TOKEN) }));
 
 app.get("/api/auth", (c) => (authorized(c.env, c.req.raw) ? c.json({ ok: true }) : unauthorized()));
 
@@ -22,41 +22,39 @@ app.get("/api/games", async (c) => {
 app.post("/api/games", async (c) => {
   if (!authorized(c.env, c.req.raw)) return unauthorized();
   const body = await c.req.json<Record<string, unknown>>().catch(() => ({}) as Record<string, unknown>);
-  const size = Number(body.size ?? 9);
-  if (!(SUPPORTED_SIZES as readonly number[]).includes(size)) return c.json({ error: "bad_size" }, 400);
-  const humanColor = parseColor(String(body.humanColor ?? "black")) ?? 1;
-  const komi = Number(body.komi ?? 7.5);
-  if (!Number.isFinite(komi) || Math.abs(komi) > 50) return c.json({ error: "bad_komi" }, 400);
+  const kind = body.kind ?? "go";
+  if (!isGameKind(kind) || !GAMES[kind].ready) return c.json({ error: "bad_kind" }, 400);
   const id = newGameId();
-  const record = await roomOf(c.env, id).create({
+  const match = await roomOf(c.env, id).create({
     id,
-    size,
-    komi,
-    humanColor,
-    humanName: typeof body.humanName === "string" ? body.humanName.slice(0, 40) : undefined,
-    aiName: typeof body.aiName === "string" ? body.aiName.slice(0, 40) : undefined,
+    kind,
+    options: typeof body.options === "object" && body.options ? (body.options as Record<string, unknown>) : {},
+    humanFirst: body.humanFirst !== false,
+    humanName: typeof body.humanName === "string" ? body.humanName : undefined,
+    aiName: typeof body.aiName === "string" ? body.aiName : undefined,
+    seed: crypto.getRandomValues(new Uint32Array(1))[0]!,
     now: Date.now(),
   });
-  return c.json({ record }, 201);
+  return c.json({ match: viewMatch(match, "human") }, 201);
 });
 
 app.get("/api/games/:id", async (c) => {
   const id = c.req.param("id");
   if (!isGameId(id)) return c.json({ error: "bad_id" }, 400);
-  const record = await roomOf(c.env, id).get();
-  return record ? c.json({ record }) : c.json({ error: "not_found" }, 404);
+  const match = await roomOf(c.env, id).get();
+  return match ? c.json({ match: viewMatch(match, "human") }) : c.json({ error: "not_found" }, 404);
 });
 
-const ACTION_TYPES = new Set(["play", "pass", "resign", "toggle_dead", "accept", "resume", "say", "rename"]);
+const ACTION_TYPES = new Set(["move", "resign", "say", "rename"]);
 
 app.post("/api/games/:id/actions", async (c) => {
   if (!authorized(c.env, c.req.raw)) return unauthorized();
   const id = c.req.param("id");
   if (!isGameId(id)) return c.json({ error: "bad_id" }, 400);
-  const action = await c.req.json<Action>().catch(() => null);
+  const action = await c.req.json<MatchAction>().catch(() => null);
   if (!action || typeof action !== "object" || !ACTION_TYPES.has(action.type)) return c.json({ error: "bad_action" }, 400);
   const res = await roomOf(c.env, id).act("human", action);
-  return res.ok ? c.json({ record: res.record }) : c.json(res, 409);
+  return res.ok ? c.json({ match: viewMatch(res.match, "human") }) : c.json(res, 409);
 });
 
 app.get("/api/games/:id/ws", async (c) => {

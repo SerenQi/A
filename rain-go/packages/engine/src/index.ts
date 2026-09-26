@@ -6,3 +6,8 @@ export * from "./score";
 export * from "./chains";
 export * from "./record";
 export * from "./text";
+export * from "./match";
+export * from "./games";
+export type { GoState } from "./games/go";
+export * from "./games/gomoku";
+export * from "./games/reversi";

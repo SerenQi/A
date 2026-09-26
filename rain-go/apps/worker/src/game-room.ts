@@ -1,35 +1,35 @@
 import { DurableObject } from "cloudflare:workers";
 import {
-  applyAction,
-  createRecord,
-  phaseOf,
-  replay,
-  resultOf,
-  waitingOn,
-  type Action,
+  GAMES,
+  applyMatchAction,
+  createMatch,
+  statusOf,
+  viewMatch,
   type Actor,
-  type GameRecord,
-  type NewGameOptions,
+  type Match,
+  type MatchAction,
+  type NewMatchOptions,
 } from "@rain-go/engine";
 import { lobbyOf, type Env } from "./env";
 import type { GameMeta } from "./lobby";
 
-export type ActResult = { ok: true; record: GameRecord } | { ok: false; error: string; message: string };
+export type ActResult = { ok: true; match: Match } | { ok: false; error: string; message: string };
 
-/** One Durable Object per game: stores the record, pushes updates over WebSockets, and lets the AI wait. */
+/** One Durable Object per game: stores the match, pushes the human's view over WebSockets, and lets the AI wait. */
 export class GameRoom extends DurableObject<Env> {
-  private record: GameRecord | null | undefined;
+  private match: Match | null | undefined;
   private waiters = new Set<() => void>();
 
-  private async load(): Promise<GameRecord | null> {
-    if (this.record === undefined) this.record = (await this.ctx.storage.get<GameRecord>("record")) ?? null;
-    return this.record;
+  private async load(): Promise<Match | null> {
+    if (this.match === undefined) this.match = (await this.ctx.storage.get<Match>("match")) ?? null;
+    return this.match;
   }
 
-  private async save(r: GameRecord): Promise<void> {
-    this.record = r;
-    await this.ctx.storage.put("record", r);
-    const payload = JSON.stringify({ type: "record", record: r });
+  private async save(m: Match): Promise<void> {
+    this.match = m;
+    await this.ctx.storage.put("match", m);
+    // WebSocket watchers see the human's view: the AI's hidden cards never leave the server.
+    const payload = JSON.stringify({ type: "match", match: viewMatch(m, "human") });
     for (const ws of this.ctx.getWebSockets()) {
       try {
         ws.send(payload);
@@ -39,42 +39,39 @@ export class GameRoom extends DurableObject<Env> {
     }
     for (const wake of this.waiters) wake();
     this.waiters.clear();
-    await lobbyOf(this.env).upsert(metaOf(r));
+    await lobbyOf(this.env).upsert(metaOf(m));
   }
 
-  async create(o: NewGameOptions): Promise<GameRecord> {
+  async create(o: NewMatchOptions): Promise<Match> {
     if (await this.load()) throw new Error("Game already exists");
-    const r = createRecord(o);
-    await this.save(r);
-    return r;
+    const m = createMatch(o);
+    await this.save(m);
+    return m;
   }
 
-  async get(): Promise<GameRecord | null> {
+  async get(): Promise<Match | null> {
     return this.load();
   }
 
-  async act(actor: Actor, action: Action): Promise<ActResult> {
-    const r = await this.load();
-    if (!r) return { ok: false, error: "not_found", message: "Game not found." };
-    const res = applyAction(r, actor, action, Date.now());
+  async act(actor: Actor, action: MatchAction): Promise<ActResult> {
+    const m = await this.load();
+    if (!m) return { ok: false, error: "not_found", message: "找不到这局" };
+    const res = applyMatchAction(m, actor, action, Date.now());
     if (!res.ok) return res;
-    await this.save(res.record);
-    return { ok: true, record: res.record };
+    await this.save(res.match);
+    return { ok: true, match: res.match };
   }
 
-  /**
-   * Resolves once the game waits on `actor` (their turn, or scoring needs their accept),
-   * the game ends, or the timeout passes. `timedOut` tells which.
-   */
-  async waitFor(actor: Actor, timeoutMs: number): Promise<{ record: GameRecord | null; timedOut: boolean }> {
+  /** Resolves once the game waits on `actor`, the game ends, or the timeout passes. */
+  async waitFor(actor: Actor, timeoutMs: number): Promise<{ match: Match | null; timedOut: boolean }> {
     const deadline = Date.now() + Math.min(Math.max(timeoutMs, 0), 58_000);
     for (;;) {
-      const r = await this.load();
-      if (!r) return { record: null, timedOut: false };
-      const s = replay(r.size, r.moves);
-      if (phaseOf(r, s) === "finished" || waitingOn(r, s).includes(actor)) return { record: r, timedOut: false };
+      const m = await this.load();
+      if (!m) return { match: null, timedOut: false };
+      const st = statusOf(m);
+      if (st.outcome || st.waitingOn.includes(actor)) return { match: m, timedOut: false };
       const left = deadline - Date.now();
-      if (left <= 0) return { record: r, timedOut: true };
+      if (left <= 0) return { match: m, timedOut: true };
       await new Promise<void>((resolve) => {
         const timer = setTimeout(resolve, left);
         this.waiters.add(() => {
@@ -90,8 +87,8 @@ export class GameRoom extends DurableObject<Env> {
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair) as [WebSocket, WebSocket];
     this.ctx.acceptWebSocket(server);
-    const r = await this.load();
-    server.send(JSON.stringify(r ? { type: "record", record: r } : { type: "error", message: "Game not found." }));
+    const m = await this.load();
+    server.send(JSON.stringify(m ? { type: "match", match: viewMatch(m, "human") } : { type: "error", message: "找不到这局" }));
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -108,19 +105,19 @@ export class GameRoom extends DurableObject<Env> {
   }
 }
 
-export function metaOf(r: GameRecord): GameMeta {
-  const s = replay(r.size, r.moves);
+export function metaOf(m: Match): GameMeta {
+  const st = statusOf(m);
   return {
-    id: r.id,
-    size: r.size,
-    humanName: r.humanName,
-    aiName: r.aiName,
-    humanColor: r.humanColor,
-    phase: phaseOf(r, s),
-    waitingOn: waitingOn(r, s),
-    moves: r.moves.filter((m) => m.k === "play" || m.k === "pass").length,
-    result: resultOf(r, s)?.text,
-    createdAt: r.createdAt,
-    updatedAt: r.updatedAt,
+    id: m.id,
+    kind: m.kind,
+    humanName: m.humanName,
+    aiName: m.aiName,
+    seats: GAMES[m.kind].seats(m.state),
+    over: Boolean(st.outcome),
+    waitingOn: st.waitingOn,
+    moves: m.log.length,
+    result: st.resultText ?? undefined,
+    createdAt: m.createdAt,
+    updatedAt: m.updatedAt,
   };
 }

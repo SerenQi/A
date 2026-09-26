@@ -30,8 +30,8 @@ export function boardText(r: GameRecord): string {
   return lines.join("\n");
 }
 
-/** Full game description written for an AI player. */
-export function describeForAi(r: GameRecord, url?: string): string {
+/** Go position and status written for an AI player. Names come from the record. */
+export function describeGo(r: GameRecord): string {
   const s = replay(r.size, r.moves);
   const aiColor = actorColor(r, "ai");
   const phase = phaseOf(r, s);
@@ -39,8 +39,7 @@ export function describeForAi(r: GameRecord, url?: string): string {
   const name = (c: 1 | 2) => (c === aiColor ? `${r.aiName} (you)` : r.humanName);
   const out: string[] = [];
 
-  out.push(`Game ${r.id} · ${r.size}x${r.size} · komi ${r.komi} · Chinese area scoring, positional superko`);
-  if (url) out.push(`Board page: ${url}`);
+  out.push(`${r.size}x${r.size} · komi ${r.komi} · Chinese area scoring, positional superko`);
   out.push(`You play ${colorName(aiColor)} (${symbol(aiColor)}). ${r.humanName} plays ${colorName(r.humanColor)} (${symbol(r.humanColor)}).`);
 
   const plays = r.moves.filter((m) => m.k === "play" || m.k === "pass").length;
@@ -55,11 +54,11 @@ export function describeForAi(r: GameRecord, url?: string): string {
 
   const waits = waitingOn(r, s);
   if (phase === "playing") {
-    out.push(`To play: ${colorName(s.toPlay)}, ${waits[0] === "ai" ? "that's YOU. Call go_play." : `waiting for ${r.humanName}. Call go_wait_for_opponent.`}`);
+    out.push(`To play: ${colorName(s.toPlay)}, ${waits[0] === "ai" ? "that's YOU." : `waiting for ${r.humanName}.`}`);
   } else if (phase === "scoring") {
     const est = areaScore(s.cells, r.size, r.dead, r.komi);
     out.push(
-      `Both players passed. Mark dead stones with go_scoring (toggle_dead), then accept. Lowercase stones below are marked dead.`,
+      `Both players passed. Play "dead C3" to mark or unmark the chain at C3 as dead, "accept" to agree, or "resume" to keep playing. Lowercase stones below are marked dead.`,
       `Current count: black ${est.black}, white ${est.white} (incl. komi). Accepted by: ${r.accepted.map(colorName).join(", ") || "nobody yet"}.`,
     );
   } else {
@@ -82,10 +81,5 @@ export function describeForAi(r: GameRecord, url?: string): string {
     );
   }
 
-  const recent = r.chat.slice(-5);
-  if (recent.length) {
-    out.push("", "Recent messages:");
-    for (const m of recent) out.push(`- ${m.from === "ai" ? `${r.aiName} (you)` : r.humanName}: ${m.text}`);
-  }
   return out.join("\n");
 }

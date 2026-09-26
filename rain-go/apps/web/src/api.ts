@@ -1,4 +1,4 @@
-import type { Action, GameRecord } from "@rain-go/engine";
+import type { Actor, GameKind, MatchAction, MatchView } from "@rain-go/engine";
 
 const TOKEN_KEY = "rain-go:token";
 const BG_KEY = "rain-go:bg";
@@ -74,12 +74,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export interface GameMeta {
   id: string;
-  size: number;
+  kind: GameKind;
   humanName: string;
   aiName: string;
-  humanColor: 1 | 2;
-  phase: "playing" | "scoring" | "finished";
-  waitingOn: ("human" | "ai")[];
+  seats: Record<Actor, string>;
+  over: boolean;
+  waitingOn: Actor[];
   moves: number;
   result?: string;
   createdAt: number;
@@ -87,12 +87,12 @@ export interface GameMeta {
 }
 
 export const api = {
-  config: () => request<{ authRequired: boolean; sizes: number[] }>("/api/config"),
+  config: () => request<{ authRequired: boolean }>("/api/config"),
   checkAuth: () => request<{ ok: true }>("/api/auth"),
   listGames: () => request<{ games: GameMeta[] }>("/api/games").then((r) => r.games),
-  createGame: (o: { size: number; humanColor: "black" | "white"; komi: number; humanName?: string; aiName?: string }) =>
-    request<{ record: GameRecord }>("/api/games", { method: "POST", body: JSON.stringify(o) }).then((r) => r.record),
-  getGame: (id: string) => request<{ record: GameRecord }>(`/api/games/${id}`).then((r) => r.record),
-  act: (id: string, action: Action) =>
-    request<{ record: GameRecord }>(`/api/games/${id}/actions`, { method: "POST", body: JSON.stringify(action) }).then((r) => r.record),
+  createGame: (o: { kind: GameKind; options: Record<string, string>; humanFirst: boolean; humanName?: string; aiName?: string }) =>
+    request<{ match: MatchView }>("/api/games", { method: "POST", body: JSON.stringify(o) }).then((r) => r.match),
+  getGame: (id: string) => request<{ match: MatchView }>(`/api/games/${id}`).then((r) => r.match),
+  act: (id: string, action: MatchAction) =>
+    request<{ match: MatchView }>(`/api/games/${id}/actions`, { method: "POST", body: JSON.stringify(action) }).then((r) => r.match),
 };

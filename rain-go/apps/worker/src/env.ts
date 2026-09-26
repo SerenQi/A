@@ -1,4 +1,5 @@
-import type { GameRoom } from "./game-room";
+import type { Actor, Match, MatchAction, NewMatchOptions } from "@rain-go/engine";
+import type { ActResult, GameRoom } from "./game-room";
 import type { Lobby } from "./lobby";
 
 export interface Env {
@@ -10,7 +11,20 @@ export interface Env {
 }
 
 export const lobbyOf = (env: Env) => env.LOBBY.get(env.LOBBY.idFromName("main"));
-export const roomOf = (env: Env, id: string) => env.GAME.get(env.GAME.idFromName(id));
+/**
+ * Typed handle to a game's Durable Object. Match.state is `unknown`, which the RPC type
+ * mapping cannot express, so results are re-typed here once.
+ */
+export function roomOf(env: Env, id: string) {
+  const stub = env.GAME.get(env.GAME.idFromName(id));
+  return {
+    create: (o: NewMatchOptions) => stub.create(o) as unknown as Promise<Match>,
+    get: () => stub.get() as unknown as Promise<Match | null>,
+    act: (actor: Actor, action: MatchAction) => stub.act(actor, action) as unknown as Promise<ActResult>,
+    waitFor: (actor: Actor, ms: number) => stub.waitFor(actor, ms) as unknown as Promise<{ match: Match | null; timedOut: boolean }>,
+    fetch: (req: Request) => stub.fetch(req),
+  };
+}
 
 export function newGameId(): string {
   const alphabet = "abcdefghijkmnpqrstuvwxyz23456789";
