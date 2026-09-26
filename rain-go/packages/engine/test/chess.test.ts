@@ -13,36 +13,41 @@ import {
   type ChessState,
   type ChessView,
   type Match,
+  type NewSeat,
+  type SeatKind,
 } from "../src";
 
 const chess = GAMES.chess;
 
-const newMatch = (humanFirst = true) =>
-  createMatch({ id: "c1", kind: "chess", humanFirst, humanName: "Seren", aiName: "Claude", seed: 1, now: 0 });
+/** Seat 0 (White) is Seren, seat 1 (Black) is Claude unless a seat is a bot. */
+const seats = (a: SeatKind = "human", b: SeatKind = "ai"): NewSeat[] =>
+  [a, b].map((kind, i) => ({ kind, token: `t${i}`, name: kind === "bot" ? undefined : ["Seren", "Claude"][i], joined: true }));
+const newMatch = (a?: SeatKind, b?: SeatKind) => createMatch({ id: "c1", kind: "chess", seats: seats(a, b), seed: 1, now: 0 });
 
-/** A match that starts from a FEN; the human plays `human`. */
-function fromFen(fen: string, human: "w" | "b" = "w"): Match {
-  return { ...newMatch(human === "w"), state: chessFromFen(fen, human) };
+/** A match that starts from a FEN. */
+function fromFen(fen: string): Match {
+  return { ...newMatch(), state: chessFromFen(fen) };
 }
+
+/** The seat whose colour is to move. */
+const toMove = (m: Match) => (S(m).turn === "w" ? 0 : 1);
 
 function play(m: Match, moves: string[]): Match {
   for (const mv of moves) {
-    const st = m.state as ChessState;
-    const who = st.turn === st.humanColor ? "human" : "ai";
-    const res = applyMatchAction(m, who, { type: "move", move: mv }, 1);
-    if (!res.ok) throw new Error(`${who} ${mv}: ${res.message}`);
+    const seat = toMove(m);
+    const res = applyMatchAction(m, seat, { type: "move", move: mv }, 1);
+    if (!res.ok) throw new Error(`seat ${seat} ${mv}: ${res.message}`);
     m = res.match;
   }
   return m;
 }
 
-function tryMove(m: Match, mv: string, who?: "human" | "ai") {
-  const st = m.state as ChessState;
-  return applyMatchAction(m, who ?? (st.turn === st.humanColor ? "human" : "ai"), { type: "move", move: mv }, 1);
+function tryMove(m: Match, mv: string, seat?: number) {
+  return applyMatchAction(m, seat ?? toMove(m), { type: "move", move: mv }, 1);
 }
 
-const errorOf = (m: Match, mv: string, who?: "human" | "ai") => {
-  const r = tryMove(m, mv, who);
+const errorOf = (m: Match, mv: string, seat?: number) => {
+  const r = tryMove(m, mv, seat);
   return r.ok ? null : r.message;
 };
 const S = (m: Match) => m.state as ChessState;
@@ -59,7 +64,7 @@ describe("chess: move generation", () => {
     expect(legal).toHaveLength(20);
     expect(legal).toContain("e2e4");
     expect(legal).toContain("g1f3");
-    expect(viewMatch<ChessView>(m, "human").view.legal).toHaveLength(20);
+    expect(viewMatch<ChessView>(m, 0).view.legal).toHaveLength(20);
   });
 
   it("perft matches known counts", () => {
@@ -78,7 +83,7 @@ describe("chess: move generation", () => {
   it("generates moves quickly", () => {
     const s = chessFromFen("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1");
     const t0 = performance.now();
-    for (let i = 0; i < 100; i++) chess.view(s, "human");
+    for (let i = 0; i < 100; i++) chess.view(s, 0);
     expect((performance.now() - t0) / 100).toBeLessThan(5);
   });
 });
@@ -129,7 +134,7 @@ describe("chess: castling", () => {
   });
 
   it("loses the right when the rook is captured", () => {
-    const m = play(fromFen("r3k2r/8/8/8/8/8/6b1/R3K2R b KQkq - 0 1", "b"), ["g2h1"]);
+    const m = play(fromFen("r3k2r/8/8/8/8/8/6b1/R3K2R b KQkq - 0 1"), ["g2h1"]);
     expect(S(m).castling).toBe("Qkq");
   });
 });
@@ -183,21 +188,22 @@ describe("chess: game end", () => {
   it("fool's mate is checkmate for Black", () => {
     const m = play(newMatch(), ["f2f3", "e7e5", "g2g4", "d8h4"]);
     const st = statusOf(m);
-    expect(st.outcome).toEqual({ winner: "ai", text: "将死" });
+    expect(st.outcome).toEqual({ winners: [1], text: "将死" });
     expect(st.resultText).toBe("Claude 胜 · 将死");
     expect(st.waitingOn).toEqual([]);
     expect(m.log.map((l) => l.move)).toEqual(["f3", "e5", "g4", "Qh4#"]);
-    expect(errorOf(m, "e2e4", "human")).toBe("对局已经结束");
+    expect(errorOf(m, "e2e4", 0)).toBe("对局已经结束");
   });
 
-  it("human as Black can win by checkmate", () => {
-    const m = play(newMatch(false), ["f2f3", "e7e5", "g2g4", "Qh4#"]);
-    expect(statusOf(m).outcome).toEqual({ winner: "human", text: "将死" });
+  it("scholar's mate is checkmate for White (seat 0)", () => {
+    const m = play(newMatch(), ["e4", "e5", "Bc4", "Nc6", "Qh5", "Nf6", "Qxf7#"]);
+    expect(statusOf(m).outcome).toEqual({ winners: [0], text: "将死" });
+    expect(statusOf(m).resultText).toBe("Seren 胜 · 将死");
   });
 
   it("stalemate is a draw", () => {
     const m = play(fromFen("7k/8/5K2/8/8/8/8/6Q1 w - - 0 1"), ["g1g6"]);
-    expect(statusOf(m).outcome).toEqual({ winner: "draw", text: "逼和" });
+    expect(statusOf(m).outcome).toEqual({ winners: [], text: "逼和" });
     expect(statusOf(m).resultText).toBe("和局 · 逼和");
   });
 
@@ -206,7 +212,7 @@ describe("chess: game end", () => {
     m = play(m, ["a1a2"]);
     expect(statusOf(m).outcome).toBeNull();
     m = play(m, ["e8d8"]);
-    expect(statusOf(m).outcome).toEqual({ winner: "draw", text: "五十步和棋" });
+    expect(statusOf(m).outcome).toEqual({ winners: [], text: "五十步和棋" });
   });
 
   it("a pawn move resets the fifty-move clock", () => {
@@ -220,7 +226,7 @@ describe("chess: game end", () => {
     m = play(m, ["g1f3", "g8f6", "f3g1", "f6g8", "g1f3", "g8f6", "f3g1"]);
     expect(statusOf(m).outcome).toBeNull();
     m = play(m, ["f6g8"]);
-    expect(statusOf(m).outcome).toEqual({ winner: "draw", text: "三次重复" });
+    expect(statusOf(m).outcome).toEqual({ winners: [], text: "三次重复" });
   });
 
   it("counts castling rights in repetition", () => {
@@ -236,7 +242,7 @@ describe("chess: game end", () => {
   it("draws on insufficient material", () => {
     // K+R vs K: capture the rook.
     let m = play(fromFen("4k3/8/8/8/8/8/4r3/4K3 w - - 0 1"), ["e1e2"]);
-    expect(statusOf(m).outcome).toEqual({ winner: "draw", text: "子力不足" });
+    expect(statusOf(m).outcome).toEqual({ winners: [], text: "子力不足" });
     // K+N vs K after capturing the last pawn.
     m = play(fromFen("4k3/8/8/8/8/8/3p4/2N1K3 w - - 0 1"), ["e1d2"]);
     expect(statusOf(m).outcome?.text).toBe("子力不足");
@@ -268,10 +274,12 @@ describe("chess: input", () => {
 
   it("rejects moves out of turn", () => {
     const m = newMatch();
-    expect(errorOf(m, "e7e5", "ai")).toBe("还没轮到你");
-    const black = newMatch(false);
-    expect(errorOf(black, "e2e4", "human")).toBe("还没轮到你");
-    expect(tryMove(black, "e2e4", "ai").ok).toBe(true);
+    expect(errorOf(m, "e7e5", 1)).toBe("还没轮到你");
+    expect(errorOf(m, "e2e4", 1)).toBe("还没轮到你");
+    expect(tryMove(m, "e2e4", 0).ok).toBe(true);
+    const after = play(m, ["e2e4"]);
+    expect(errorOf(after, "d2d4", 0)).toBe("还没轮到你");
+    expect(tryMove(after, "e7e5", 1).ok).toBe(true);
   });
 
   it("accepts SAN and logs SAN", () => {
@@ -297,11 +305,20 @@ describe("chess: input", () => {
   });
 });
 
-describe("chess: view and describe", () => {
-  it("views the board with check, last move and seats", () => {
+describe("chess: seats, view and describe", () => {
+  it("has two seats, White first", () => {
+    expect(chess.players).toEqual({ min: 2, max: 2, default: 2 });
+    const m = newMatch();
+    expect(statusOf(m).waitingOn).toEqual([0]);
+    expect(statusOf(play(m, ["e4"])).waitingOn).toEqual([1]);
+    expect(() => createMatch({ id: "x", kind: "chess", seats: [...seats(), { kind: "human", token: "t2" }], seed: 1, now: 0 })).toThrow(/2-2 players/);
+  });
+
+  it("views the board with check, last move and seat labels", () => {
     const m = play(newMatch(), ["e2e4", "f7f6", "d2d4", "g7g5", "d1h5"]);
-    const v = viewMatch<ChessView>(m, "human");
-    expect(v.seats).toEqual({ human: "白方", ai: "黑方" });
+    const v = viewMatch<ChessView>(m, 0);
+    expect(v.labels).toEqual(["白方", "黑方"]);
+    expect(v.me).toBe(0);
     expect(v.view.board).toHaveLength(64);
     expect(v.view.you).toBe("w");
     expect(v.view.check).toBe(true);
@@ -309,34 +326,73 @@ describe("chess: view and describe", () => {
     expect(v.view.last).toMatchObject({ from: 59, to: 31, uci: "d1h5", san: "Qh5#" });
     expect(statusOf(m).outcome?.text).toBe("将死");
     expect(v.view.legal).toEqual([]);
-    expect(viewMatch<ChessView>(newMatch(false), "human").seats).toEqual({ human: "黑方", ai: "白方" });
-    expect(viewMatch<ChessView>(newMatch(false), "human").view.you).toBe("b");
+    expect(viewMatch<ChessView>(newMatch(), 1).view.you).toBe("b");
+  });
+
+  it("gives spectators the public board with no colour", () => {
+    const m = play(newMatch(), ["e4", "e5"]);
+    const spec = viewMatch<ChessView>(m, null);
+    expect(spec.me).toBeNull();
+    expect(spec.view.you).toBeNull();
+    expect(spec.labels).toEqual(["白方", "黑方"]);
+    expect(spec.view.board).toBe(viewMatch<ChessView>(m, 0).view.board);
+    expect(spec.view.legal).toEqual(viewMatch<ChessView>(m, 1).view.legal);
+    expect(JSON.stringify(spec)).not.toContain("t0");
+    expect(JSON.stringify(spec)).not.toContain("history");
+    expect("humanColor" in spec.view).toBe(false);
   });
 
   it("tracks captures, material and move number", () => {
     const m = play(newMatch(), ["e4", "d5", "exd5", "Qxd5"]);
-    const v = chess.view(S(m), "human") as ChessView;
+    const v = chess.view(S(m), 0) as ChessView;
     expect(v.captured).toEqual({ w: "p", b: "P" });
     expect(v.material).toEqual({ w: 38, b: 38 });
     expect(v.moveNumber).toBe(3);
     expect(v.fen).toBe("rnb1kbnr/ppp1pppp/8/3q4/8/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3");
   });
 
-  it("describes the position and legal moves on the AI's turn", () => {
+  it("describes the position and legal moves for Black (seat 1) on its turn", () => {
     const m = play(newMatch(), ["e2e4"]);
-    const t = describeMatch(m);
+    const t = describeMatch(m, 1);
+    expect(t).toContain("You are Claude in seat 1 (黑方)");
     expect(t).toContain("FEN: rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1");
-    expect(t).toContain("You play Black");
+    expect(t).toContain("You play Black (lowercase letters). Seren plays White (uppercase letters).");
     expect(t).toContain("YOUR TURN");
-    expect(t).toContain("Last move: e4 (e2e4)");
+    expect(t).toContain("Last move: e4 (e2e4) by Seren.");
     expect(t).toContain("Your legal moves (20)");
     expect(t).toContain("g8f6 (Nf6)");
     expect(t).toContain(" 8  r n b q k b n r  8");
     expect(t).toContain(" 4  . . . . P . . .  4");
     expect(t).toContain("Material: White 39, Black 39 (even)");
-    const human = describeMatch(play(m, ["e7e5"]));
-    expect(human).not.toContain("Your legal moves");
-    expect(human).toContain("waiting for Seren");
+    const later = describeMatch(play(m, ["e7e5"]), 1);
+    expect(later).not.toContain("Your legal moves");
+    expect(later).toContain("waiting for Seren");
+    expect(later).toContain("Last move: e5 (e7e5) by you.");
+  });
+
+  it("describes the position for White (seat 0) too", () => {
+    const m = newMatch("ai", "human");
+    const t = describeMatch(m, 0);
+    expect(t).toContain("You play White (uppercase letters). Claude plays Black (lowercase letters).");
+    expect(t).toContain("Move 1, White to move: YOUR TURN.");
+    expect(t).toContain("Your legal moves (20)");
+    expect(t).toContain("e2e4 (e4)");
+    const after = play(m, ["e4", "d5", "exd5"]);
+    const w = describeMatch(after, 0);
+    expect(w).toContain("waiting for Claude");
+    expect(w).toContain("Last move: exd5 (e4d5) by you.");
+    expect(w).toContain("you are up 1");
+    expect(describeMatch(after, 1)).toContain("you are down 1");
+    expect(describeMatch(after, 1)).toContain("Last move: exd5 (e4d5) by Seren.");
+  });
+
+  it("describes check and the end of the game from each side", () => {
+    const m = play(newMatch(), ["f3", "e5", "g4", "Qh4#"]);
+    expect(describeMatch(m, 1)).toContain("Game over: checkmate. You (Black) won.");
+    expect(describeMatch(m, 0)).toContain("Game over: checkmate. Claude (Black) won.");
+    const chk = play(newMatch(), ["e4", "f5", "Qh5+"]);
+    expect(describeMatch(chk, 1)).toContain("CHECK: your king on e8 is in check.");
+    expect(describeMatch(chk, 0)).toContain("You are giving check.");
   });
 
   it("round-trips FEN and stays JSON-only", () => {
@@ -349,4 +405,82 @@ describe("chess: view and describe", () => {
     tryMove(m, "Nf3");
     expect(JSON.stringify(m.state)).toBe(before);
   });
+});
+
+describe("chess: bot", () => {
+  const bot = (fen: string) => {
+    const s = chessFromFen(fen);
+    return chess.bot!(s, s.turn === "w" ? 0 : 1);
+  };
+  const SAMPLE = [
+    "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+    "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+    "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R b KQkq - 0 1",
+    "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1",
+    "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1",
+    "r1bq1rk1/pp2bppp/2n1pn2/3p4/2PP4/2N1PN2/PP3PPP/R2QKB1R w KQ - 0 8",
+    "8/8/8/K2Pp2r/8/8/8/7k w - e6 0 1",
+    "4k3/4r3/8/8/8/8/3P4/4K3 w - - 0 1",
+    "8/P6k/8/8/8/8/8/K7 w - - 0 1",
+    "4k3/8/8/8/8/8/8/Q3K3 b - - 0 1",
+    "rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq - 0 2",
+  ];
+
+  it("always returns a legal move, deterministically", () => {
+    for (const fen of SAMPLE) {
+      const mv = bot(fen);
+      expect(chessLegalMoves(chessFromFen(fen)), fen).toContain(mv);
+      expect(bot(fen)).toBe(mv);
+    }
+  });
+
+  it("is fast on busy positions", () => {
+    bot(SAMPLE[1]!); // warm up the JIT
+    const t0 = performance.now();
+    for (const fen of SAMPLE.slice(0, 6)) bot(fen);
+    expect((performance.now() - t0) / 6).toBeLessThan(100);
+  });
+
+  it("takes a free queen", () => {
+    expect(bot("4k3/8/8/3q4/8/8/8/3RK3 w - - 0 1")).toBe("d1d5");
+    expect(bot("4k3/8/2n5/8/3Q4/8/8/4K3 b - - 0 1")).toBe("c6d4");
+    expect(bot("rnb1kbnr/pppp1ppp/8/4p3/4P2q/5N2/PPPP1PPP/RNBQKB1R w KQkq - 2 3")).toBe("f3h4");
+  });
+
+  it("finds mate in one", () => {
+    expect(bot("6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1")).toBe("a1a8");
+    expect(bot("rnbqkbnr/pppp1ppp/8/4p3/6P1/5P2/PPPPP2P/RNBQKBNR b KQkq - 0 2")).toBe("d8h4");
+    expect(bot("r1bqkbnr/pppp1ppp/2n5/4p2Q/2B1P3/8/PPPP1PPP/RNB1K1NR w KQkq - 4 4")).toBe("h5f7");
+  });
+
+  it("does not leave its queen en prise", () => {
+    // Queen on d4 attacked by the c5 pawn.
+    const fen = "rnbqkbnr/pp1ppppp/8/2p5/3Q4/8/PPP1PPPP/RNB1KBNR w KQkq - 0 3";
+    const m = play(fromFen(fen), [bot(fen)]);
+    const q = S(m).board.indexOf("Q");
+    expect(q).toBeGreaterThanOrEqual(0);
+    const hits = chessLegalMoves(S(m)).filter((u) => (8 - Number(u[3])) * 8 + "abcdefgh".indexOf(u[2]!) === q);
+    expect(hits).toEqual([]);
+  });
+
+  it("answers a human at once from either seat", () => {
+    let m = newMatch("human", "bot");
+    expect(m.seats[1]!.name).toBe("小雨");
+    m = play(m, ["e4"]);
+    expect(m.log.map((l) => l.seat)).toEqual([0, 1]);
+    expect(statusOf(m).waitingOn).toEqual([0]);
+    const b = newMatch("bot", "human");
+    expect(b.log).toHaveLength(1);
+    expect(b.log[0]!.seat).toBe(0);
+    expect(statusOf(b).waitingOn).toEqual([1]);
+  });
+
+  it("two bots play a whole game to the end", () => {
+    const m = createMatch({ id: "bb", kind: "chess", seats: [{ kind: "bot", token: "a" }, { kind: "bot", token: "b" }], seed: 7, now: 0 });
+    const st = statusOf(m);
+    expect(st.outcome).not.toBeNull();
+    expect(st.waitingOn).toEqual([]);
+    expect(m.log.length).toBeGreaterThan(10);
+    expect(m.log.every((l, i) => l.seat === i % 2)).toBe(true);
+  }, 60000);
 });

@@ -38,11 +38,14 @@ function Piece({ piece, x, y, className, opacity }: { piece: string; x: number; 
   );
 }
 
-function Board({ view: s, canAct, send, toast }: BoardProps<ChessView>) {
+function Board({ view: s, me, canAct, send, toast }: BoardProps<ChessView>) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [promo, setPromo] = useState<{ from: number; to: number } | null>(null);
-  const flip = s.you === "b";
+  /** This screen's colour: seat 0 plays White, seat 1 Black; spectators have none. */
+  const side = s.you ?? (me === null ? null : me === 0 ? "w" : "b");
+  /** White sits at the bottom for White and for spectators; Black's screen is turned around. */
+  const flip = side === "b";
   /** Display cell (row * 8 + col, row 0 at the top) <-> board square; the map is its own inverse. */
   const cell = (sq: number) => (flip ? 63 - sq : sq);
   const xy = (sq: number) => ({ x: (cell(sq) & 7) + 0.5, y: (cell(sq) >> 3) + 0.5 });
@@ -50,7 +53,7 @@ function Board({ view: s, canAct, send, toast }: BoardProps<ChessView>) {
   useEffect(() => {
     setSelected(null);
     setPromo(null);
-  }, [s.plies, canAct, s.you]);
+  }, [s.plies, canAct, side]);
 
   const moves = useMemo(() => {
     const out = new Map<number, { to: number; promo: boolean }[]>();
@@ -64,13 +67,13 @@ function Board({ view: s, canAct, send, toast }: BoardProps<ChessView>) {
     return out;
   }, [s.legal]);
 
-  const mine = (sq: number) => s.board[sq] !== "." && isWhite(s.board[sq]!) === (s.you === "w");
+  const mine = (sq: number) => side !== null && s.board[sq] !== "." && isWhite(s.board[sq]!) === (side === "w");
   const targets = selected !== null && canAct && !promo ? (moves.get(selected) ?? []) : [];
   const promoX = promo ? Math.min(Math.max((cell(promo.to) & 7) + 0.5 - 2, 0), 4) : 0;
   const promoY = promo ? Math.min((cell(promo.to) >> 3) + 1.05, 6.8) : 0;
 
   const onPointerUp = (e: PointerEvent<SVGSVGElement>) => {
-    if (!canAct) return;
+    if (!canAct || side === null) return;
     const m = svgRef.current?.getScreenCTM();
     if (!m) return;
     const pt = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse());
@@ -114,7 +117,7 @@ function Board({ view: s, canAct, send, toast }: BoardProps<ChessView>) {
       ref={svgRef}
       viewBox="-0.5 -0.5 9 9"
       className="block h-full w-full touch-manipulation select-none"
-      style={{ cursor: canAct ? "pointer" : undefined, WebkitTapHighlightColor: "transparent" }}
+      style={{ cursor: canAct && side ? "pointer" : undefined, WebkitTapHighlightColor: "transparent" }}
       onPointerUp={onPointerUp}
       role="grid"
       aria-label="国际象棋棋盘"
@@ -186,7 +189,7 @@ function Board({ view: s, canAct, send, toast }: BoardProps<ChessView>) {
           />
           <g filter="url(#drop-shadow)">
             {PROMOS.map((t, i) => (
-              <Piece key={t} piece={s.you === "w" ? t.toUpperCase() : t} x={promoX + i + 0.5} y={promoY + 0.5} className="drop-in" />
+              <Piece key={t} piece={side === "b" ? t : t.toUpperCase()} x={promoX + i + 0.5} y={promoY + 0.5} className="drop-in" />
             ))}
           </g>
         </g>
@@ -200,7 +203,11 @@ const points = (letters: string) => Array.from(letters).reduce((n, p) => n + (VA
 export const chessUI: GameUI<ChessView> = {
   shape: "square",
   Board,
-  status: (s, m) => (s.check && !m.status.outcome ? "将军！" : null),
+  status: (s, m) => {
+    if (!s.check || m.status.outcome) return null;
+    if (s.you === s.turn) return "将军！轮到你应将";
+    return `将军！等 ${m.seats[s.turn === "w" ? 0 : 1]?.name ?? ""} 应将`;
+  },
   badge: (s) => ({ value: String(s.moveNumber), label: "MOVE" }),
   stats: (s) => [
     { label: "手数", value: String(s.plies) },
