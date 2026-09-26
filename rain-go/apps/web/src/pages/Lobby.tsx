@@ -22,6 +22,7 @@ export const GLYPH: Record<GameKind, string> = {
   poker: "♠",
   paodekuai: "跑",
   monopoly: "⚄",
+  aeroplane: "✈",
 };
 
 function statusOf(g: GameMeta) {
@@ -134,7 +135,7 @@ export function Lobby() {
             <div className="shrink-0 whitespace-nowrap text-[1.7rem] font-bold leading-none tracking-tight lg:text-[3rem]">开一局</div>
             <div className="truncate pl-3 text-sm text-muted lg:text-base">{mod.blurb}</div>
           </div>
-          <div className="mt-3 grid grid-cols-4 gap-1.5 [@media(max-height:620px)]:mt-0 lg:mt-5 lg:gap-2.5">
+          <div className="mt-3 grid grid-cols-5 gap-1.5 [@media(max-height:620px)]:mt-0 lg:mt-5 lg:gap-2.5">
             {readyGames().map((g) => (
               <button
                 key={g.kind}
@@ -145,7 +146,7 @@ export function Lobby() {
                 }`}
               >
                 <span className="text-[1.2rem] leading-none lg:text-[1.6rem]">{GLYPH[g.kind]}</span>
-                <span className="mt-1 text-[0.72rem] leading-none lg:text-sm">{g.name.zh}</span>
+                <span className="mt-1 whitespace-nowrap text-[0.7rem] leading-none lg:text-sm">{g.name.zh}</span>
               </button>
             ))}
           </div>

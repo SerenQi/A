@@ -1,4 +1,5 @@
 import type { GameKind, GameModule } from "../match/types";
+import { aeroplane } from "./aeroplane";
 import { chess } from "./chess";
 import { go } from "./go";
 import { gomoku } from "./gomoku";
@@ -8,5 +9,5 @@ import { poker } from "./poker";
 import { reversi } from "./reversi";
 import { xiangqi } from "./xiangqi";
 
-export const GAMES: Record<GameKind, GameModule> = { go, gomoku, reversi, chess, xiangqi, poker, paodekuai, monopoly };
+export const GAMES: Record<GameKind, GameModule> = { go, gomoku, reversi, chess, xiangqi, poker, paodekuai, monopoly, aeroplane };
 export const readyGames = () => Object.values(GAMES).filter((g) => g.ready);

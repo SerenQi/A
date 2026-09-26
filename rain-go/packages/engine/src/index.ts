@@ -16,3 +16,4 @@ export * from "./games/xiangqi";
 export * from "./games/poker";
 export * from "./games/paodekuai";
 export * from "./games/monopoly";
+export * from "./games/aeroplane";

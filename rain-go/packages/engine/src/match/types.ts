@@ -1,7 +1,7 @@
 export type Actor = "human" | "ai";
 export const otherActor = (a: Actor): Actor => (a === "human" ? "ai" : "human");
 
-export const GAME_KINDS = ["go", "gomoku", "reversi", "chess", "xiangqi", "poker", "paodekuai", "monopoly"] as const;
+export const GAME_KINDS = ["go", "gomoku", "reversi", "chess", "xiangqi", "poker", "paodekuai", "monopoly", "aeroplane"] as const;
 export type GameKind = (typeof GAME_KINDS)[number];
 export const isGameKind = (s: unknown): s is GameKind => typeof s === "string" && (GAME_KINDS as readonly string[]).includes(s);
 
