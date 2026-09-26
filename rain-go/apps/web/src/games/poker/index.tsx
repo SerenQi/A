@@ -100,7 +100,11 @@ function SeatChip({ v, i, name, shown, sc }: { v: PokerView; i: Seat; name: stri
       <div className="flex min-w-0 items-center" style={{ gap: 3 * sc, opacity: dim && !shown ? 0.45 : 1 }}>
         <div className="flex shrink-0" style={{ gap: sc < 1 ? 1 : 2 * sc }}>
           {shown
-            ? shown.map((c) => <PokerMiniCard key={`${v.hand}-${c}`} card={c} h={h} />)
+            ? shown.map((c) => (
+                <span key={`${v.hand}-${c}`} style={{ opacity: v.over ? 1 : 0.72 }}>
+                  <PokerMiniCard card={c} h={h} />
+                </span>
+              ))
             : seat.cards
               ? [0, 1].map((k) => <PokerMiniCard key={k} h={h} />)
               : [0, 1].map((k) => <PokerMiniSlot key={k} h={h} />)}
@@ -132,7 +136,7 @@ function SeatRow({ v, i, name, cards, note }: { v: PokerView; i: Seat; name: str
     <div className="flex shrink-0 items-center" style={{ height: "var(--ch)", gap: "calc(var(--ch) * 0.28)" }}>
       <div className="flex shrink-0" style={{ gap: "calc(var(--ch) * 0.07)", opacity: seat.status === "folded" ? 0.5 : 1 }}>
         {cards && cards.length
-          ? cards.map((c) => <PokerCard key={`${v.hand}-${c}`} card={c} className="drop-in" />)
+          ? cards.map((c) => <PokerCard key={`${v.hand}-${c}`} card={c} className="drop-in" dim={i !== v.viewer && !v.over} />)
           : seat.cards
             ? [0, 1].map((k) => <PokerCardBack key={k} />)
             : [0, 1].map((k) => <PokerCardSlot key={k} />)}
