@@ -87,7 +87,7 @@ export function MatchScreen({
   const seatLine =
     n === 2
       ? [me ?? 0, 1 - (me ?? 0)].map((i) => `${names[i]} ${labelOf(i)}`).join(" · ")
-      : `${n} 人桌 · ${me === null ? "观战" : `你是${labelOf(me) || `座位 ${me + 1}`}`}`;
+      : `${n} 人桌 · ${me === null ? "观战" : `你 ${labelOf(me) || `${me + 1} 号位`}`}`;
   const thinking = !st.outcome && acting === featured;
   const subtitle = (
     <>
