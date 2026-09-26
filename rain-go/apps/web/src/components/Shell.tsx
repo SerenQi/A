@@ -25,6 +25,10 @@ export function useWide(query = "(min-width: 1000px)") {
   return wide;
 }
 
+/** A phone held sideways (matches the `land:` CSS variant). */
+export const LANDSCAPE_QUERY = "(orientation: landscape) and (max-height: 540px) and (max-width: 999px)";
+export const useLandscape = () => useWide(LANDSCAPE_QUERY);
+
 export const hhmm = (d: Date | number) =>
   new Date(d).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 
@@ -56,7 +60,7 @@ export function Header({ status, left }: { status: ReactNode; left?: ReactNode }
   const now = useNow();
   const [open, setOpen] = useState(false);
   return (
-    <header className="flex shrink-0 items-center justify-between gap-3 pt-[max(12px,env(safe-area-inset-top))] pb-2.5 lg:pt-6 lg:pb-4">
+    <header className="flex shrink-0 items-center justify-between gap-3 pt-[max(12px,env(safe-area-inset-top))] pb-2.5 land:pt-2 land:pb-2 lg:pt-6 lg:pb-4">
       <div className="min-w-0">
         {left ?? (
           <div className="truncate text-[clamp(1.05rem,4.6vw,1.4rem)] leading-tight text-muted">
@@ -91,7 +95,7 @@ function BottomNav({ route }: { route: Route }) {
     }
   };
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 px-4 pb-[max(10px,env(safe-area-inset-bottom))] lg:pb-[max(14px,env(safe-area-inset-bottom))]">
+    <nav className="fixed inset-x-0 bottom-0 z-20 px-4 land:hidden pb-[max(10px,env(safe-area-inset-bottom))] lg:pb-[max(14px,env(safe-area-inset-bottom))]">
       <div className="glass mx-auto flex h-[68px] max-w-[520px] items-center justify-around !rounded-[30px] px-2 lg:h-auto lg:!rounded-[34px] lg:py-2.5">
         {NAV.map(({ key, label, icon: Icon }) => {
           const active = route.name === key;
@@ -116,7 +120,7 @@ export function Shell({ route, children, wide = false }: { route: Route; childre
     <>
       <Backdrop />
       <main
-        className={`mx-auto flex h-dvh flex-col overflow-hidden px-4 pb-[calc(80px+max(10px,env(safe-area-inset-bottom)))] lg:block lg:h-auto lg:overflow-visible lg:pb-40 ${
+        className={`mx-auto flex h-dvh flex-col overflow-hidden px-4 pb-[calc(80px+max(10px,env(safe-area-inset-bottom)))] land:max-w-none land:pr-[max(12px,env(safe-area-inset-right))] land:pb-[max(8px,env(safe-area-inset-bottom))] land:pl-[max(12px,env(safe-area-inset-left))] lg:block lg:h-auto lg:overflow-visible lg:pb-40 ${
           wide ? "max-w-[520px] lg:max-w-[1100px]" : "max-w-[520px]"
         }`}
       >

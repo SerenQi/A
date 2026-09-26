@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* A phone held sideways: wide but short. Pages switch to a two-column layout. */
+@custom-variant land (@media (orientation: landscape) and (max-height: 540px) and (max-width: 999px));
+
 @theme {
   --font-serif: "Source Serif 4", "Noto Serif SC", "Songti SC", Georgia, serif;
   --font-sans: "Source Serif 4", "Noto Serif SC", "Songti SC", Georgia, serif;

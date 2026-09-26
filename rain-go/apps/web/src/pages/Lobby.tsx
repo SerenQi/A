@@ -137,13 +137,13 @@ export function Lobby() {
     <>
       {toast.node}
       <Header status={`sync · ${syncedAt ? hhmm(syncedAt) : "--:--"}`} />
-      <div className="flex min-h-0 flex-1 flex-col gap-2.5 lg:block lg:space-y-5">
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5 land:grid land:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] land:grid-rows-[auto_minmax(0,1fr)] land:gap-3 lg:block lg:space-y-5">
         <motion.div {...card} className="shrink-0 [@media(max-height:700px)]:hidden lg:!block">
           <Pill title={BRAND.en} subtitle={`${BRAND.zh} · ${BRAND.tagline} · 连接 MCP，和 AI 玩 ›`} onClick={() => navigate("/connect")} />
         </motion.div>
 
         {needToken && (
-          <motion.section {...card} className="glass shrink-0 px-5 py-4 lg:px-7 lg:py-6">
+          <motion.section {...card} className="glass shrink-0 px-5 py-4 land:col-start-2 land:row-start-1 lg:px-7 lg:py-6">
             <div className="text-[1.2rem] font-semibold lg:text-[1.5rem]">访问口令</div>
             <p className="mt-0.5 text-sm text-muted lg:text-base">这个站点设了口令。填一次，这台设备会记住。</p>
             <form
@@ -160,7 +160,7 @@ export function Lobby() {
           </motion.section>
         )}
 
-        <motion.section {...card} className="glass shrink-0 px-4 py-3.5 lg:px-7 lg:py-7">
+        <motion.section {...card} className="glass shrink-0 px-4 py-3.5 land:col-start-1 land:row-span-2 land:row-start-1 land:min-h-0 land:overflow-y-auto lg:px-7 lg:py-7">
           <div className="flex items-baseline justify-between [@media(max-height:620px)]:hidden lg:!flex">
             <div className="shrink-0 whitespace-nowrap text-[1.7rem] font-bold leading-none tracking-tight lg:text-[3rem]">开一局</div>
             <div className="truncate pl-3 text-sm text-muted lg:text-base">{mod.blurb}</div>
@@ -171,7 +171,7 @@ export function Lobby() {
                 key={g.kind}
                 onClick={() => setKind(g.kind)}
                 aria-pressed={kind === g.kind}
-                className={`flex h-[52px] flex-col items-center justify-center rounded-2xl border transition lg:h-[72px] ${
+                className={`flex h-[52px] flex-col items-center justify-center rounded-2xl border transition land:h-[44px] lg:h-[72px] ${
                   kind === g.kind ? "border-transparent bg-ink text-white" : "border-white/80 bg-white/35 text-ink"
                 }`}
               >
@@ -214,7 +214,7 @@ export function Lobby() {
                     －
                   </button>
                 )}
-                <button className={`${seg} shrink-0 !px-2.5 text-sm`} aria-label="换先手" onClick={() => setSeats([...seats.slice(1), seats[0]!])}>
+                <button className={`${seg} shrink-0 whitespace-nowrap !px-2.5 text-sm`} aria-label="换先手" onClick={() => setSeats([...seats.slice(1), seats[0]!])}>
                   轮换
                 </button>
               </div>
@@ -246,7 +246,7 @@ export function Lobby() {
           <p className="mt-4 hidden text-sm text-faint lg:block">也可以直接让 AI 调用 new_game 开局，它会把链接发给你。</p>
         </motion.section>
 
-        <motion.section {...card} className="glass flex min-h-[100px] flex-1 flex-col px-5 py-3 lg:block lg:px-7 lg:py-6">
+        <motion.section {...card} className={`glass flex min-h-[100px] flex-1 flex-col px-5 py-3 land:col-start-2 land:min-h-0 lg:block lg:px-7 lg:py-6 ${needToken ? "land:row-start-2" : "land:row-span-2 land:row-start-1"}`}>
           <div className="flex shrink-0 items-baseline justify-between">
             <div className="text-[1.25rem] font-bold lg:text-[1.9rem]">Games</div>
             <div className="text-sm text-muted">

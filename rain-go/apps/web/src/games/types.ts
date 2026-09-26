@@ -30,6 +30,8 @@ export interface GameUI<V = any> {
   status?: (view: V, match: MatchView<V>) => string | null;
   /** Small figure for the right side of the black pill, e.g. { value: "17", label: "MOVE" }. */
   badge?: (view: V, match: MatchView<V>) => { value: string; label: string };
+  /** True for games that are roomier with the phone turned sideways; portrait phones get a one-time hint. */
+  prefersLandscape?: boolean;
   /** Extra numbers for the desktop stats card. */
   stats?: (view: V, match: MatchView<V>) => { label: string; value: string }[];
 }

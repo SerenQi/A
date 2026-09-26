@@ -4,10 +4,12 @@ import { useEffect, useState, type ReactNode } from "react";
 import { UIS } from "../games";
 import type { BoardProps } from "../games/types";
 import { ChatInput, ChatList, Sheet } from "./Chat";
-import { DropMark, IconChat, IconFlag, IconInvite, IconName } from "./icons";
+import { DropMark, IconChat, IconFlag, IconGear, IconHome, IconInvite, IconName } from "./icons";
+import { Settings } from "./Settings";
 import { NameSheet } from "./NameSheet";
 import { Pill, Stat } from "./Pill";
-import { Header, useWide } from "./Shell";
+import { Header, useLandscape, useWide } from "./Shell";
+import { navigate } from "../router";
 import { useToast } from "./Toast";
 
 const card = { initial: { opacity: 0, y: 14 }, animate: { opacity: 1, y: 0 }, transition: { duration: 0.35 } };
@@ -31,10 +33,12 @@ export function MatchScreen({
   onInvite?: () => void;
 }) {
   const wide = useWide();
+  const landscape = useLandscape();
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [namesOpen, setNamesOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [seenChat, setSeenChat] = useState(0);
   const mod = GAMES[match.kind];
   const ui = UIS[match.kind];
@@ -45,6 +49,20 @@ export function MatchScreen({
   useEffect(() => {
     if (chatOpen) setSeenChat(match.chat.length);
   }, [chatOpen, match.chat.length]);
+
+  // Card tables are roomier sideways: tell portrait phone users once per game.
+  useEffect(() => {
+    if (wide || landscape || !ui.prefersLandscape) return;
+    const key = `rain-go:rotate-tip:${match.kind}`;
+    try {
+      if (localStorage.getItem(key)) return;
+      localStorage.setItem(key, "1");
+    } catch {
+      return;
+    }
+    const t = setTimeout(() => toast.show("把手机横过来，牌桌更宽敞"), 900);
+    return () => clearTimeout(t);
+  }, [wide, landscape, ui.prefersLandscape, match.kind, toast.show]);
 
   const send = async (a: MatchAction) => {
     if (busy || me === null) return false;
@@ -165,6 +183,128 @@ export function MatchScreen({
     </>
   );
 
+  const pill = (
+    <button onClick={() => setChatOpen(true)} className="pill-black flex shrink-0 items-center gap-3 !rounded-[26px] px-3.5 py-2.5 text-left land:gap-2.5 land:!rounded-[18px] land:px-2.5 land:py-2 land:shadow-none">
+      <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full border-2 border-[#3a3a3a] bg-[#161616] land:h-9 land:w-9">
+        <DropMark width={24} height={24} className="land:h-5 land:w-5" />
+        {unread && <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-black bg-accent" />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[1.25rem] italic leading-tight land:text-[1.05rem]">{names[featured]}</span>
+        <span className="block truncate text-[0.9rem] text-white/70 land:text-[0.8rem]">{subtitle}</span>
+      </span>
+      <span className="shrink-0 text-right">
+        <span className="block text-[1.4rem] font-bold leading-none land:text-[1.15rem]">{verdict ?? badge.value}</span>
+        <span className="mt-1 block text-[0.72rem] text-white/55 land:text-[0.65rem]">{verdict ? mod.name.zh : badge.label}</span>
+      </span>
+    </button>
+  );
+  const iconButtons = (
+    <>
+      {!st.outcome && me !== null && (
+        <button className="btn btn-glass shrink-0 !px-3.5" onClick={resign} aria-label="认输">
+          <IconFlag width={20} height={20} />
+        </button>
+      )}
+      {onInvite && openSeats && (
+        <button className="btn btn-glass shrink-0 !px-3.5" onClick={onInvite} aria-label="邀请">
+          <IconInvite width={20} height={20} />
+        </button>
+      )}
+      <button className="btn btn-glass shrink-0 !px-3.5" onClick={() => setNamesOpen(true)} aria-label="名字">
+        <IconName width={20} height={20} />
+      </button>
+      <button className="btn btn-glass relative shrink-0 !px-3.5" onClick={() => setChatOpen(true)} aria-label="聊天">
+        <IconChat width={20} height={20} />
+        {unread && <span className="absolute top-1.5 right-2 h-2 w-2 rounded-full bg-accent" />}
+      </button>
+    </>
+  );
+
+  if (!wide && landscape) {
+    // Phone held sideways: the board on the left at full height, one glass panel on the right with
+    // status and opponent at the top, recent moves in the middle, and the controls at the bottom
+    // where the right thumb rests.
+    const square = ui.shape === "square";
+    const recent = match.log.slice(-6);
+    const lastChat = match.chat.at(-1);
+    const tool = "relative grid h-10 w-10 shrink-0 place-items-center rounded-full text-ink-2 transition active:scale-95 active:bg-white/60";
+    return (
+      <>
+        {toast.node}
+        <div className="flex min-h-0 flex-1 justify-center gap-3 py-[max(8px,env(safe-area-inset-top))]">
+          <div className={square ? "flex aspect-square h-full min-h-0 max-w-[calc(100%-272px)] shrink-0 flex-col" : "flex min-h-0 min-w-0 flex-1 flex-col"}>
+            {board}
+          </div>
+          <aside className={`glass flex min-h-0 shrink-0 flex-col gap-2 !rounded-[24px] p-2.5 ${square ? "w-auto min-w-[260px] max-w-[360px] flex-1" : "w-[min(290px,40vw)]"}`}>
+            <div className="flex shrink-0 items-center gap-2 px-1.5 pt-0.5">
+              <span className={`h-2 w-2 shrink-0 rounded-full ${myTurn ? "bg-ink" : "bg-faint"}`} />
+              <span className="min-w-0 flex-1 truncate text-[0.95rem]">{status}</span>
+              <span className="flex shrink-0 items-center gap-1 text-[0.72rem] text-faint">{chip}</span>
+            </div>
+            {pill}
+            {seatStrip && <div className="shrink-0 [&>div]:flex-wrap [&>div]:overflow-visible">{seatStrip}</div>}
+            <div className="flex min-h-0 flex-1 flex-col justify-end overflow-hidden rounded-[16px] bg-white/25 px-3 py-2">
+              {recent.length === 0 && !lastChat && (
+                <div className="my-auto px-2 text-center">
+                  <div className="text-[1.05rem] text-ink-2">{mod.name.zh}</div>
+                  <div className="mt-1 text-[0.8rem] leading-snug text-faint">{mod.blurb}</div>
+                </div>
+              )}
+              {/* Newest at the bottom; when space runs out the oldest lines are the ones cut off. */}
+              <div className="flex min-h-0 flex-col-reverse gap-0.5 overflow-hidden [mask-image:linear-gradient(to_top,black_70%,transparent)]">
+                {[...recent].reverse().map((l, i) => (
+                  <div key={match.log.length - i} className={`flex shrink-0 gap-1.5 truncate text-[0.82rem] leading-snug ${i === 0 ? "text-ink" : "text-muted"}`}>
+                    <span className="shrink-0 text-faint">{l.seat === me ? "你" : names[l.seat]}</span>
+                    <span className="truncate">{l.move}</span>
+                  </div>
+                ))}
+              </div>
+              {lastChat && (
+                <button onClick={() => setChatOpen(true)} className="mt-1.5 shrink-0 truncate border-t border-black/5 pt-1.5 text-left text-[0.82rem] italic text-ink-2">
+                  {lastChat.seat === me ? "你" : names[lastChat.seat]}：{lastChat.text}
+                </button>
+              )}
+            </div>
+            {Actions && !st.outcome && me !== null && (
+              <div className="flex shrink-0 gap-2 [&_.btn]:!min-h-[42px] [&_.btn]:flex-1">
+                <Actions {...props} />
+              </div>
+            )}
+            <div className="flex shrink-0 items-center justify-between px-0.5">
+              <button className={tool} onClick={() => navigate("/")} aria-label="回大厅">
+                <IconHome width={20} height={20} />
+              </button>
+              {!st.outcome && me !== null && (
+                <button className={tool} onClick={resign} aria-label="认输">
+                  <IconFlag width={20} height={20} />
+                </button>
+              )}
+              {onInvite && openSeats && (
+                <button className={tool} onClick={onInvite} aria-label="邀请">
+                  <IconInvite width={20} height={20} />
+                </button>
+              )}
+              <button className={tool} onClick={() => setNamesOpen(true)} aria-label="名字">
+                <IconName width={20} height={20} />
+              </button>
+              <button className={tool} onClick={() => setChatOpen(true)} aria-label="聊天">
+                <IconChat width={20} height={20} />
+                {unread && <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-accent" />}
+              </button>
+              <button className={tool} onClick={() => setSettingsOpen(true)} aria-label="设置">
+                <IconGear width={19} height={19} />
+              </button>
+            </div>
+            {extra && <div className="shrink-0 [&_.btn]:!min-h-[32px] [&_.btn]:!text-xs">{extra}</div>}
+          </aside>
+        </div>
+        {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}
+        {sheets}
+      </>
+    );
+  }
+
   if (!wide) {
     return (
       <>
@@ -179,41 +319,20 @@ export function MatchScreen({
           }
         />
         <div className="flex min-h-0 flex-1 flex-col gap-2">
-          <button onClick={() => setChatOpen(true)} className="pill-black flex shrink-0 items-center gap-3 !rounded-[26px] px-3.5 py-2.5 text-left">
-            <span className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full border-2 border-[#3a3a3a] bg-[#161616]">
-              <DropMark width={24} height={24} />
-              {unread && <span className="absolute -top-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-black bg-accent" />}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-[1.25rem] italic leading-tight">{names[featured]}</span>
-              <span className="block truncate text-[0.9rem] text-white/70">{subtitle}</span>
-            </span>
-            <span className="shrink-0 text-right">
-              <span className="block text-[1.4rem] font-bold leading-none">{verdict ?? badge.value}</span>
-              <span className="mt-1 block text-[0.72rem] text-white/55">{verdict ? mod.name.zh : badge.label}</span>
-            </span>
-          </button>
+          {pill}
           {seatStrip}
           {board}
           <div className="flex shrink-0 gap-2 [&_.btn]:!min-h-[44px]">
-            {Actions && !st.outcome && me !== null ? <Actions {...props} /> : <div className="chip flex-1 justify-center !text-ink">{mod.name.zh}</div>}
-            {!st.outcome && me !== null && (
-              <button className="btn btn-glass shrink-0 !px-3.5" onClick={resign} aria-label="认输">
-                <IconFlag width={20} height={20} />
-              </button>
+            {Actions && !st.outcome && me !== null ? (
+              <Actions {...props} />
+            ) : (
+              <div className="chip min-w-0 flex-1 justify-center !text-ink">
+                <span className="truncate">
+                  {match.log.length ? `${match.log.at(-1)!.seat === me ? "你" : names[match.log.at(-1)!.seat]} · ${match.log.at(-1)!.move}` : mod.name.zh}
+                </span>
+              </div>
             )}
-            {onInvite && openSeats && (
-              <button className="btn btn-glass shrink-0 !px-3.5" onClick={onInvite} aria-label="邀请">
-                <IconInvite width={20} height={20} />
-              </button>
-            )}
-            <button className="btn btn-glass shrink-0 !px-3.5" onClick={() => setNamesOpen(true)} aria-label="名字">
-              <IconName width={20} height={20} />
-            </button>
-            <button className="btn btn-glass relative shrink-0 !px-3.5" onClick={() => setChatOpen(true)} aria-label="聊天">
-              <IconChat width={20} height={20} />
-              {unread && <span className="absolute top-1.5 right-2 h-2 w-2 rounded-full bg-accent" />}
-            </button>
+            {iconButtons}
           </div>
           {extra}
         </div>

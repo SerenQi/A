@@ -282,6 +282,7 @@ function Board({ match, view: v, me, canAct, send, toast, compact }: BoardProps<
 
 export const doudizhuUI: GameUI<DdzView> = {
   shape: "fill",
+  prefersLandscape: true,
   Board,
   status: (v, match) => {
     if (v.phase === "over") return null;

@@ -294,6 +294,7 @@ function Board({ match, view: v, me, canAct, send, toast, compact }: BoardProps<
 
 export const paodekuaiUI: GameUI<PaodekuaiView> = {
   shape: "fill",
+  prefersLandscape: true,
   Board,
   status: (v) => {
     if (v.winner !== null || !v.myTurn) return null;

@@ -442,6 +442,7 @@ function Board({ match, view: v, me: meSeat, canAct, send, compact }: BoardProps
 
 export const pokerUI: GameUI<PokerView> = {
   shape: "fill",
+  prefersLandscape: true,
   Board,
   status: (v, match) => {
     if (v.over) return null;
