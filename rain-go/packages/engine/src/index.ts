@@ -11,3 +11,8 @@ export * from "./games";
 export type { GoState } from "./games/go";
 export * from "./games/gomoku";
 export * from "./games/reversi";
+export * from "./games/chess";
+export * from "./games/xiangqi";
+export * from "./games/poker";
+export * from "./games/paodekuai";
+export * from "./games/monopoly";
