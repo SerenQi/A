@@ -8,6 +8,7 @@
   --color-muted: rgb(24 24 24 / 0.52);
   --color-faint: rgb(24 24 24 / 0.3);
   --color-accent: #a8433f;
+  --breakpoint-lg: 1000px;
 }
 
 :root {
@@ -281,3 +282,25 @@ body {
 .area-controls { grid-area: controls; }
 .area-stats { grid-area: stats; }
 .area-chat { grid-area: chat; }
+
+/* Board that fills whatever height is left on a one-screen layout. */
+.board-fit {
+  container-type: size;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+}
+.board-fit > .board-box {
+  width: min(100cqw, 100cqh);
+  height: min(100cqw, 100cqh);
+}
+
+.sheet-enter {
+  animation: sheet-up 0.28s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}

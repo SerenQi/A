@@ -5,13 +5,13 @@ import { DropMark } from "./icons";
 export function Pill({ title, subtitle, onClick }: { title: ReactNode; subtitle: ReactNode; onClick?: () => void }) {
   const Tag = onClick ? "button" : "div";
   return (
-    <Tag onClick={onClick} className="pill-black flex w-full items-center gap-4 px-5 py-4 text-left">
-      <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full border-[3px] border-[#3a3a3a] bg-[#161616]">
-        <DropMark width={30} height={30} />
+    <Tag onClick={onClick} className="pill-black flex w-full shrink-0 items-center gap-3 !rounded-[26px] px-3.5 py-2.5 text-left lg:gap-4 lg:!rounded-[36px] lg:px-5 lg:py-4">
+      <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-2 border-[#3a3a3a] bg-[#161616] lg:h-16 lg:w-16 lg:border-[3px]">
+        <DropMark className="h-6 w-6 lg:h-[30px] lg:w-[30px]" />
       </span>
       <span className="min-w-0">
-        <span className="block truncate text-[1.7rem] italic leading-tight">{title}</span>
-        <span className="block truncate text-[1.05rem] text-white/70">{subtitle}</span>
+        <span className="block truncate text-[1.25rem] italic leading-tight lg:text-[1.7rem]">{title}</span>
+        <span className="block truncate text-[0.9rem] text-white/70 lg:text-[1.05rem]">{subtitle}</span>
       </span>
     </Tag>
   );

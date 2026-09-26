@@ -10,7 +10,8 @@
     "test": "echo 'worker: covered by smoke test (pnpm smoke)'",
     "cf-typegen": "wrangler types",
     "smoke": "node scripts/smoke.mjs",
-    "seed": "node scripts/seed-demo.mjs"
+    "seed": "node scripts/seed-demo.mjs",
+    "ai-pass": "node scripts/ai-pass.mjs"
   },
   "dependencies": {
     "@cfworker/json-schema": "^4.1.1",

@@ -13,6 +13,18 @@ export function useNow(ms = 30_000) {
   return now;
 }
 
+/** True on wide screens, where pages scroll normally. Narrow screens get a one-screen layout. */
+export function useWide(query = "(min-width: 1000px)") {
+  const [wide, setWide] = useState(() => typeof window !== "undefined" && window.matchMedia(query).matches);
+  useEffect(() => {
+    const m = window.matchMedia(query);
+    const on = () => setWide(m.matches);
+    m.addEventListener("change", on);
+    return () => m.removeEventListener("change", on);
+  }, [query]);
+  return wide;
+}
+
 export const hhmm = (d: Date | number) =>
   new Date(d).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 
@@ -40,20 +52,22 @@ function Backdrop() {
   );
 }
 
-export function Header({ status }: { status: ReactNode }) {
+export function Header({ status, left }: { status: ReactNode; left?: ReactNode }) {
   const now = useNow();
   const [open, setOpen] = useState(false);
   return (
-    <header className="flex items-center justify-between gap-3 pt-6 pb-4">
+    <header className="flex shrink-0 items-center justify-between gap-3 pt-[max(12px,env(safe-area-inset-top))] pb-2.5 lg:pt-6 lg:pb-4">
       <div className="min-w-0">
-        <div className="truncate text-[clamp(1.1rem,5vw,1.4rem)] leading-tight text-muted">
-          {now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
-        </div>
+        {left ?? (
+          <div className="truncate text-[clamp(1.05rem,4.6vw,1.4rem)] leading-tight text-muted">
+            {now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+          </div>
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <span className="chip">{status}</span>
-        <button className="chip !p-2.5 !text-ink" onClick={() => setOpen(true)} aria-label="设置">
-          <IconGear width={22} height={22} />
+        <button className="chip !p-2 !text-ink lg:!p-2.5" onClick={() => setOpen(true)} aria-label="设置">
+          <IconGear width={20} height={20} />
         </button>
       </div>
       {open && <Settings onClose={() => setOpen(false)} />}
@@ -77,18 +91,18 @@ function BottomNav({ route }: { route: Route }) {
     }
   };
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-20 px-4 pb-[max(14px,env(safe-area-inset-bottom))]">
-      <div className="glass mx-auto flex max-w-[520px] justify-around !rounded-[34px] px-2 py-2.5">
+    <nav className="fixed inset-x-0 bottom-0 z-20 px-4 pb-[max(10px,env(safe-area-inset-bottom))] lg:pb-[max(14px,env(safe-area-inset-bottom))]">
+      <div className="glass mx-auto flex h-[68px] max-w-[520px] items-center justify-around !rounded-[30px] px-2 lg:h-auto lg:!rounded-[34px] lg:py-2.5">
         {NAV.map(({ key, label, icon: Icon }) => {
           const active = route.name === key;
           return (
-            <button key={key} onClick={() => go(key)} className="flex w-20 flex-col items-center gap-1" aria-current={active ? "page" : undefined}>
+            <button key={key} onClick={() => go(key)} className="flex w-20 flex-col items-center gap-0.5 lg:gap-1" aria-current={active ? "page" : undefined}>
               <span
-                className={`grid h-12 w-12 place-items-center rounded-full transition ${active ? "bg-ink text-white" : "text-faint"}`}
+                className={`grid h-10 w-10 place-items-center rounded-full transition lg:h-12 lg:w-12 ${active ? "bg-ink text-white" : "text-faint"}`}
               >
-                <Icon width={22} height={22} />
+                <Icon width={21} height={21} />
               </span>
-              <span className={`text-sm ${active ? "font-semibold text-ink" : "text-faint"}`}>{label}</span>
+              <span className={`text-xs lg:text-sm ${active ? "font-semibold text-ink" : "text-faint"}`}>{label}</span>
             </button>
           );
         })}
@@ -101,7 +115,13 @@ export function Shell({ route, children, wide = false }: { route: Route; childre
   return (
     <>
       <Backdrop />
-      <main className={`mx-auto px-4 pb-40 ${wide ? "max-w-[1100px]" : "max-w-[520px]"}`}>{children}</main>
+      <main
+        className={`mx-auto flex h-dvh flex-col overflow-hidden px-4 pb-[calc(80px+max(10px,env(safe-area-inset-bottom)))] lg:block lg:h-auto lg:overflow-visible lg:pb-40 ${
+          wide ? "max-w-[520px] lg:max-w-[1100px]" : "max-w-[520px]"
+        }`}
+      >
+        {children}
+      </main>
       <BottomNav route={route} />
     </>
   );

@@ -43,11 +43,14 @@ echo 'ACCESS_TOKEN=devtoken' > apps/worker/.dev.vars
 pnpm dev                              # 构建前端并在 http://127.0.0.1:8787 启动 Worker
 pnpm --filter @rain-go/worker smoke  # 另开终端：端到端跑一遍 MCP 对局流程
 pnpm --filter @rain-go/worker seed   # 造一局有长棋块和提子的演示棋
+pnpm --filter @rain-go/worker ai-pass <id>  # 让 AI 停一手，方便测试数子阶段
 pnpm test                             # 规则引擎单元测试
 pnpm typecheck
 ```
 
 改前端时可以用 `pnpm dev:web`，Vite 会把 `/api` 和 `/mcp` 代理到 8787 端口。
+
+宽度小于 1000px 时，每一页都固定在一屏内，不需要滚动：棋盘按剩余高度缩放，聊天记录和输入框收在聊天按钮里。宽屏是两栏布局，可以正常滚动。
 
 ## 部署到 Cloudflare
 
