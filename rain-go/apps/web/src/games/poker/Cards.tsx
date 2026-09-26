@@ -79,3 +79,30 @@ export function PokerDisc({ dark, size = 16, children }: { dark: boolean; size?:
     </span>
   );
 }
+
+const BACK =
+  "repeating-linear-gradient(45deg, rgb(255 255 255 / 0.075) 0 1px, transparent 1px 3.5px), radial-gradient(circle at 35% 25%, #3a3a3a, #0b0b0b 60%, #000)";
+
+/** A small card for the seat chips, `h` pixels tall: face up with `card`, face down without. */
+export function PokerMiniCard({ card, h }: { card?: string; h: number }) {
+  const size: CSSProperties = { width: Math.round(h * 0.7), height: h, borderRadius: Math.max(2, h * 0.14) };
+  if (!card) {
+    return <div className="shrink-0" style={{ ...size, background: BACK, boxShadow: "inset 0 0 0 1.5px #0b0b0b, inset 0 0 0 2.5px rgb(255 255 255 / 0.2), 0 1px 3px rgb(0 0 0 / 0.2)" }} aria-label="背面" />;
+  }
+  return (
+    <div
+      className="drop-in flex shrink-0 select-none flex-col items-center justify-center border border-black/10 bg-white/85 font-serif leading-none shadow-[0_1px_4px_rgb(0_0_0/0.12)]"
+      style={{ ...size, color: isRed(card) ? "var(--color-accent)" : "var(--color-ink)", gap: h * 0.02 }}
+      aria-label={pokerCardLabel(card)}
+    >
+      <span className="font-semibold" style={{ fontSize: h * 0.44, letterSpacing: "-0.07em" }}>
+        {pokerRankLabel(card)}
+      </span>
+      <span style={{ fontSize: h * 0.36 }}>{pokerSuitSymbol(card)}</span>
+    </div>
+  );
+}
+
+export function PokerMiniSlot({ h }: { h: number }) {
+  return <div className="shrink-0 border border-dashed border-[rgb(20_20_20/0.16)]" style={{ width: Math.round(h * 0.7), height: h, borderRadius: Math.max(2, h * 0.14) }} />;
+}
