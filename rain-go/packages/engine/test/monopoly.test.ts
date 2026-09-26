@@ -76,7 +76,7 @@ describe("monopoly setup", () => {
   it("board has 24 spaces with 16 properties in 8 pairs", () => {
     const v = view(newMatch());
     expect(v.spaces).toHaveLength(24);
-    expect(v.spaces.map((s) => s.name).filter((n, i) => [0, 6, 12, 18].includes(i))).toEqual(["起点", "拘留所", "茶馆", "去拘留所"]);
+    expect(v.spaces.map((s) => s.name).filter((n, i) => [0, 6, 12, 18].includes(i))).toEqual(["起点", "大牢", "茶馆", "去大牢"]);
     const props = v.spaces.filter((s) => s.kind === "property");
     expect(props).toHaveLength(16);
     for (let g = 0; g < 8; g++) expect(props.filter((p) => p.group === g)).toHaveLength(2);
@@ -242,17 +242,17 @@ describe("monopoly doubles and jail", () => {
     ]);
     m = play(m, 0, "roll"); // 2 秋池
     m = play(m, 0, "skip");
-    m = play(m, 0, "roll"); // 6 拘留所, just visiting
+    m = play(m, 0, "roll"); // 6 大牢, just visiting
     expect(st(m).players[0]!.inJail).toBe(false);
     expect(st(m).phase).toBe("roll");
     m = play(m, 0, "roll");
     expect(st(m).players[0]).toMatchObject({ pos: 6, inJail: true });
     expect(st(m).phase).toBe("end");
     expect(fail(m, 0, "roll")).toBe("这回合已经掷过了，可以结束回合");
-    expect(m.log.at(-1)!.move).toBe("掷出 3+3，连掷三次对子，进拘留所");
+    expect(m.log.at(-1)!.move).toBe("掷出 3+3，连掷三次对子，进大牢");
   });
 
-  it("the 去拘留所 space jails you without the 起点 bonus, even on a double", () => {
+  it("the 去大牢 space jails you without the 起点 bonus, even on a double", () => {
     const base = newMatch();
     let m = withState(base, { players: players(base, { 0: { pos: 13 } }) }, [[2, 3]]);
     m = play(m, 0, "roll");
@@ -276,7 +276,7 @@ describe("monopoly doubles and jail", () => {
     m = play(m, 0, "交钱");
     expect(st(m).players[0]).toMatchObject({ inJail: false, cash: 1450 });
     expect(st(m).phase).toBe("roll");
-    expect(fail(m, 0, "pay")).toBe("你不在拘留所");
+    expect(fail(m, 0, "pay")).toBe("你不在大牢");
     m = play(m, 0, "roll");
     expect(st(m).players[0]!.pos).toBe(9);
     expect(st(m).players[0]!.cash).toBe(1350);
@@ -581,7 +581,7 @@ describe("monopoly moves and text", () => {
     expect(fail(m, 0, "fly")).toBe("看不懂这步：fly");
     expect(fail(m, 0, "结束回合")).toBe("先掷骰子");
     expect(fail(m, 0, "买")).toBe("这里没有可买的地");
-    expect(fail(m, 0, "用卡")).toBe("你不在拘留所");
+    expect(fail(m, 0, "用卡")).toBe("你不在大牢");
   });
 
   it("views (every seat and spectators) and describe hide the deck order and RNG", () => {

@@ -251,7 +251,7 @@ function sendToJail(s: MonopolyState, seat: Seat) {
     s.rollAgain = false;
     s.phase = "end";
   }
-  ev(s, seat, "jail", "进拘留所", `sent to jail (${MONOPOLY_JAIL} 拘留所)`);
+  ev(s, seat, "jail", "进大牢", `sent to jail (${MONOPOLY_JAIL} 大牢)`);
 }
 
 /** Puts `seat` out of the game. Ends the game when one player is left. */
@@ -588,7 +588,7 @@ export function monopolyBot(s: MonopolyState, seat: Seat): string {
 const RULES = [
   "大富翁, a Monopoly-style dice game for 2-4 players on a ring of 24 spaces (indices 0-23, clockwise).",
   "Seat 0 moves first; turns go round in seat order, skipping bankrupt players. Tokens by seat: 墨 (ink), 乳 (milk), 灰 (grey), 朱 (milk with a red ring).",
-  "Corners: 0 起点 (collect 200 whenever you pass or land on it), 6 拘留所 (jail / just visiting), 12 茶馆 (free rest), 18 去拘留所 (go straight to jail, no 200).",
+  "Corners: 0 起点 (collect 200 whenever you pass or land on it), 6 大牢 (jail / just visiting), 12 茶馆 (free rest), 18 去大牢 (go straight to jail, no 200).",
   "Spaces 3 and 15 are 命运 (chance: draw the top card of a shuffled 11-card deck, reshuffled when empty). 9 税 costs 100, 21 灯油 costs 50.",
   "The other 16 spaces are properties in 8 groups of 2 (G1 cheapest to G8 dearest, prices 60 to 400).",
   "Everyone starts with 1500 on 起点. On your turn: roll two dice and move. Doubles let you roll again; a third double in a row sends you to jail instead of moving.",
@@ -680,7 +680,7 @@ export const monopoly: GameModule<MonopolyState, MonopolyView> = {
         break;
       }
       case "pay":
-        if (!p.inJail) return { ok: false, error: "你不在拘留所" };
+        if (!p.inJail) return { ok: false, error: "你不在大牢" };
         if (s.phase !== "roll") return { ok: false, error: "这回合已经掷过了" };
         if (p.cash < MONOPOLY_JAIL_FINE) return { ok: false, error: `钱不够交 ${MONOPOLY_JAIL_FINE}` };
         p.cash -= MONOPOLY_JAIL_FINE;
@@ -689,7 +689,7 @@ export const monopoly: GameModule<MonopolyState, MonopolyView> = {
         ev(s, seat, "free", `交 ${MONOPOLY_JAIL_FINE} 出狱`, `paid ${MONOPOLY_JAIL_FINE} to leave jail`);
         break;
       case "card":
-        if (!p.inJail) return { ok: false, error: "你不在拘留所" };
+        if (!p.inJail) return { ok: false, error: "你不在大牢" };
         if (p.cards <= 0) return { ok: false, error: "你没有出狱卡" };
         if (s.phase !== "roll") return { ok: false, error: "这回合已经掷过了" };
         p.cards--;

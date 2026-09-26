@@ -215,7 +215,7 @@ function DuoPlayers({ v, match, compact }: { v: MonopolyView; match: MatchView<M
             </div>
             <div className="truncate leading-tight text-muted" style={{ fontSize: cq(compact ? 3.4 : 2.7), marginTop: cq(0.6) }}>
               身家 {p.worth}
-              {p.inJail ? " · 拘留中" : ""}
+              {p.inJail ? " · 坐牢中" : ""}
               {p.cards ? ` · 出狱卡 ${p.cards}` : ""}
             </div>
           </div>
@@ -231,8 +231,8 @@ function TablePlayers({ v, match, compact }: { v: MonopolyView; match: MatchView
     <div className="grid grid-cols-2" style={{ columnGap: cq(2), rowGap: cq(1.4) }}>
       {v.players.map((p) => {
         const turn = !v.over && v.turn === p.seat;
-        const state = p.bankrupt ? "出局" : [p.inJail ? "拘留" : "", p.cards ? `卡${p.cards}` : ""].filter(Boolean).join(" ");
-        // Phones: only the state (拘留 / 出局) next to the cash, in a readable size; desktop also shows net worth.
+        const state = p.bankrupt ? "出局" : [p.inJail ? "坐牢" : "", p.cards ? `卡${p.cards}` : ""].filter(Boolean).join(" ");
+        // Phones: only the state (坐牢 / 出局) next to the cash, in a readable size; desktop also shows net worth.
         const note = compact ? state : state || `身家 ${p.worth}`;
         return (
           <div
@@ -360,9 +360,9 @@ function Popover({
   const here = v.players.filter((p) => !p.bankrupt && p.pos === sp.index);
   const text: Record<string, string> = {
     start: "经过或停在这里，领 200。",
-    jail: "路过只是探望。进了拘留所：掷对子、交 50 或用出狱卡出来。",
+    jail: "路过只是探望。进了大牢：掷对子、交 50 或用出狱卡出来。",
     rest: "茶馆歇脚，什么也不发生。",
-    gotojail: "直接去拘留所，不经过起点。",
+    gotojail: "直接去大牢，不经过起点。",
     chance: "抽一张命运牌。",
     tax: `交 ${sp.tax}。`,
   };
@@ -536,7 +536,7 @@ export const monopolyUI: GameUI<MonopolyView> = {
       const sp = v.spaces[v.offer.index]!;
       return p.cash >= sp.price! ? `要不要买${sp.name}？` : `钱不够买${sp.name}`;
     }
-    if (v.phase === "roll") return p.inJail ? (p.cards ? "拘留中：掷对子、交 50 或用卡" : "拘留中：掷对子或交 50") : v.rollAgain ? "对子！再掷一次" : "到你掷骰";
+    if (v.phase === "roll") return p.inJail ? (p.cards ? "坐牢中：掷对子、交 50 或用卡" : "坐牢中：掷对子或交 50") : v.rollAgain ? "对子！再掷一次" : "到你掷骰";
     return v.buildable.length ? "点自己的地可以盖房" : "可以结束回合";
   },
   badge: (v) =>
