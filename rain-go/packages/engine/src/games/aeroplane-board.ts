@@ -6,8 +6,9 @@
  *
  * Colours: 0..3. Colour 0 owns the bottom arm and the bottom-left hangar; colours 1, 2, 3 are colour 0
  * rotated 90°, 180°, 270° clockwise about the centre (left arm / top-left hangar, top arm / top-right
- * hangar, right arm / bottom-right hangar). In the two-player game seat 0 (先手, ink) is colour 0 and
- * seat 1 (后手, milk) is colour 2; colours 1 and 3 are only square colours on the loop.
+ * hangar, right arm / bottom-right hangar). Seats take colours in seat order (see aeroplaneColours):
+ * two players use the opposite colours 0 and 2, three use 0, 1, 2 and four use all four. Unused
+ * colours are only square colours on the loop.
  *
  * Loop: 52 squares, global index g = 0..51 (shown to players as square g + 1), running clockwise on
  * screen. g 0..12 is: bottom arm left column going up (6,14)..(6,9), the left arm bottom row going left

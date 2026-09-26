@@ -21,6 +21,8 @@ export function buildSeats(kind: GameKind, gameId: string, raw: unknown): { seat
   }
   if (specs.some((s) => !KINDS.has(s.kind))) return { error: "座位类型只能是 human、ai 或 bot" };
   if (specs.some((s) => s.kind === "bot") && !mod.bot) return { error: `${mod.name.zh}还没有机器人` };
+  // Bot-only tables would have nobody to drive them past the autoplay cap, and burn CPU for no one.
+  if (!specs.some((s) => s.kind === "human" || s.kind === "ai")) return { error: "至少要有一个真人或 AI 座位" };
   const mineIdx = specs.findIndex((s) => s.me);
   if (specs.filter((s) => s.me).length > 1) return { error: "只能坐一个座位" };
   return {

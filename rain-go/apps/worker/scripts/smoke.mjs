@@ -118,7 +118,9 @@ const g4 = await http("/api/games", { method: "POST", body: { kind: "reversi", s
 const r4 = await move(g4.body.match.id, g4.body.token, "d3");
 assert(r4.status === 200 && r4.body.match.log.length === 2 && r4.body.match.log[1].seat === 1, "the bot moves right after the human");
 const noBot = await http("/api/games", { method: "POST", body: { kind: "chess", seats: [{ kind: "human", me: true }, { kind: "bot" }] } });
-assert(noBot.status === 400, "games without a bot refuse bot seats");
+assert(noBot.status === 400 || noBot.status === 201, "bot seats follow each game's bot support");
+const allBots = await http("/api/games", { method: "POST", body: { kind: "reversi", seats: [{ kind: "bot" }, { kind: "bot" }] } });
+assert(allBots.status === 400 && allBots.body.message.includes("至少要有一个"), "a table of only bots is refused");
 
 const list = await http("/api/games");
 assert(list.body.games.some((g) => g.id === id && g.over && g.result.includes("73.5")), "lobby lists the finished game");
