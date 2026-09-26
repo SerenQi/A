@@ -14,7 +14,7 @@ import type { BoardProps, GameUI } from "../types";
 
 /**
  * Board in display units: intersections at x 0..8, y 0..9, one unit apart.
- * The human's side is at the bottom (the board is flipped when the human plays Black).
+ * The viewer's side is at the bottom: Red for seat 0 and for spectators, flipped for Black.
  */
 const PX = 0.78;
 const PY = 1.02;
@@ -122,8 +122,10 @@ function Piece({ p, lifted }: { p: string; lifted?: boolean }) {
   );
 }
 
-function Board({ view: s, canAct, send, toast }: BoardProps<XiangqiView>) {
-  const flip = s.humanColor === "b";
+function Board({ view: s, me, canAct, send, toast }: BoardProps<XiangqiView>) {
+  /** This screen's side, from the view or the seat (seat 0 is Red); null for spectators. */
+  const mine = s.you ?? (me === null ? null : me === 0 ? "r" : "b");
+  const flip = mine === "b";
   const disp = (i: number) => {
     const f = i % 9;
     const r = (i / 9) | 0;
@@ -132,7 +134,6 @@ function Board({ view: s, canAct, send, toast }: BoardProps<XiangqiView>) {
   const svgRef = useRef<SVGSVGElement>(null);
   const movedRef = useRef<SVGGElement>(null);
   const [sel, setSel] = useState<number | null>(null);
-  const mine = s.toPlay;
 
   useEffect(() => setSel(null), [s.moves, canAct]);
 
@@ -172,10 +173,10 @@ function Board({ view: s, canAct, send, toast }: BoardProps<XiangqiView>) {
     return r * 9 + f;
   };
 
-  const own = (i: number) => !!s.board[i] && xiangqiIsRed(s.board[i]!) === (mine === "r");
+  const own = (i: number) => mine !== null && !!s.board[i] && xiangqiIsRed(s.board[i]!) === (mine === "r");
 
   const onUp = (e: PointerEvent<SVGSVGElement>) => {
-    if (!canAct) return;
+    if (!canAct || mine !== s.toPlay) return;
     const i = pointAt(e);
     if (i === null) return setSel(null);
     if (sel !== null && selTargets.includes(i)) {
@@ -268,7 +269,11 @@ const glyphs = (list: string[]) => list.map(xiangqiGlyph).join("") || "—";
 export const xiangqiUI: GameUI<XiangqiView> = {
   shape: "square",
   Board,
-  status: (s, m) => (s.check && !m.status.outcome ? "将军！" : null),
+  status: (s, m) => {
+    if (!s.check || m.status.outcome) return null;
+    if (s.you === s.toPlay) return "被将军 · 轮到你";
+    return s.you === null ? `${m.seats[s.toPlay === "r" ? 0 : 1]?.name ?? ""} 被将军` : "将军！";
+  },
   badge: (s) => ({ value: String(s.moves), label: "MOVE" }),
   stats: (s) => [
     { label: "手数", value: String(s.moves) },

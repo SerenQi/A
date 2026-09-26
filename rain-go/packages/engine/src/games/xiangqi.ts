@@ -1,4 +1,5 @@
-import type { Actor, LegacyGameModule } from "../match/types";
+import type { GameModule, Seat } from "../match/types";
+import { xiangqiBotMove } from "./xiangqi-bot";
 import {
   XIANGQI_FILES,
   XIANGQI_START_FEN,
@@ -21,15 +22,15 @@ import {
 } from "./xiangqi-rules";
 
 export * from "./xiangqi-rules";
+export { xiangqiBotLegalMoves, xiangqiBotMove, xiangqiEvaluate } from "./xiangqi-bot";
 
 /**
- * Xiangqi (Chinese chess). Red moves first. See ./xiangqi-rules for the board layout:
+ * Xiangqi (Chinese chess). Seat 0 plays Red and moves first, seat 1 plays Black. See ./xiangqi-rules for the board layout:
  * `board[rank * 9 + file]`, file 0 = "a" on Red's left, rank 0 = Red's back rank.
  */
 export interface XiangqiState {
   board: XiangqiBoard;
   toPlay: XiangqiSide;
-  humanColor: XiangqiSide;
   /** Plies played. */
   moves: number;
   /** Plies since the last capture (draw at 120). */
@@ -41,6 +42,8 @@ export interface XiangqiState {
 }
 
 export interface XiangqiView extends XiangqiState {
+  /** The viewer's side, or null for spectators (who see the board from Red's side). */
+  you: XiangqiSide | null;
   /** The side to move is in check. */
   check: boolean;
   /** Point of the checked general, if any. */
@@ -52,8 +55,10 @@ export interface XiangqiView extends XiangqiState {
 export const XIANGQI_DRAW_PLIES = 120;
 
 const other = (c: XiangqiSide): XiangqiSide => (c === "r" ? "b" : "r");
-const colorOf = (s: XiangqiState, a: Actor): XiangqiSide => (a === "human" ? s.humanColor : other(s.humanColor));
-const actorOf = (s: XiangqiState, c: XiangqiSide): Actor => (c === s.humanColor ? "human" : "ai");
+/** Seat 0 is Red, seat 1 is Black. */
+const sideOf = (seat: Seat): XiangqiSide => (seat === 0 ? "r" : "b");
+const seatOf = (c: XiangqiSide): Seat => (c === "r" ? 0 : 1);
+const SIDE_ZH: Record<XiangqiSide, string> = { r: "红方", b: "黑方" };
 const ATTACKERS = /[rncpRNCP]/;
 
 /** End-of-game check for the side about to move. */
@@ -64,10 +69,10 @@ function judge(board: XiangqiBoard, toPlay: XiangqiSide, quiet: number): Xiangqi
   return undefined;
 }
 
-/** A state from standard xiangqi FEN, e.g. for tests or puzzles. */
-export function xiangqiFromFen(fen: string, humanColor: XiangqiSide = "r"): XiangqiState {
+/** A state from standard xiangqi FEN, e.g. for tests or puzzles. Seat 0 is still Red. */
+export function xiangqiFromFen(fen: string): XiangqiState {
   const { board, toPlay } = xiangqiParseFen(fen);
-  return { board, toPlay, humanColor, moves: 0, quiet: 0, captured: [], result: judge(board, toPlay, 0) };
+  return { board, toPlay, moves: 0, quiet: 0, captured: [], result: judge(board, toPlay, 0) };
 }
 
 const NAMES: Record<string, string> = { k: "General", a: "Advisor", b: "Elephant", n: "Horse", r: "Chariot", c: "Cannon", p: "Soldier" };
@@ -105,15 +110,16 @@ export function xiangqiBoardText(board: XiangqiBoard): string {
 const LEGEND =
   "Legend: uppercase = Red, lowercase = Black. K/k general 帥/將, A/a advisor 仕/士, B/b elephant 相/象, N/n horse 馬, R/r chariot 車, C/c cannon 炮/砲, P/p soldier 兵/卒. Files a-i left to right from Red's side, ranks 0 (Red's back rank) to 9 (Black's back rank); Red's palace is d0-f2, Black's d7-f9.";
 
-export const xiangqi: LegacyGameModule<XiangqiState, XiangqiView> = {
+export const xiangqi: GameModule<XiangqiState, XiangqiView> = {
   kind: "xiangqi",
   name: { zh: "中国象棋", en: "Xiangqi" },
   family: "棋",
   blurb: "楚河汉界，将死对方的帅。",
   ready: true,
+  players: { min: 2, max: 2, default: 2 },
   options: [],
   rules: [
-    "Xiangqi (Chinese chess) on 9 files x 10 ranks; pieces stand on intersections. Red moves first.",
+    "Xiangqi (Chinese chess) on 9 files x 10 ranks; pieces stand on intersections. Two players: seat 0 plays Red (uppercase) and moves first, seat 1 plays Black (lowercase).",
     "General (K): one step orthogonally, never leaving the 3x3 palace. Advisor (A): one step diagonally inside the palace.",
     "Elephant (B): exactly two points diagonally, cannot cross the river, and is blocked if the point in between is occupied.",
     "Horse (N): one step orthogonally then one diagonally outward; blocked if the orthogonally adjacent point in that direction is occupied (hobbled leg).",
@@ -126,13 +132,13 @@ export const xiangqi: LegacyGameModule<XiangqiState, XiangqiView> = {
     'Moves are ICCS coordinates "h2e2" (from, to): files a-i from Red\'s left to right, ranks 0-9 from Red\'s back rank up to Black\'s. "h2-e2" also works. Example openings: Red h2e2 (炮二平五), Black h9g7 (馬8進7).',
   ].join(" "),
   moveHelp: '"h2e2" (ICCS from+to: files a-i from Red\'s left, ranks 0-9 from Red\'s back rank)',
-  create({ humanFirst }) {
+  create() {
     const { board } = xiangqiParseFen(XIANGQI_START_FEN);
-    return { board, toPlay: "r", humanColor: humanFirst ? "r" : "b", moves: 0, quiet: 0, captured: [] };
+    return { board, toPlay: "r", moves: 0, quiet: 0, captured: [] };
   },
-  apply(s, actor, move) {
+  apply(s, seat, move) {
     if (s.result) return { ok: false, error: "对局已经结束" };
-    const side = colorOf(s, actor);
+    const side = sideOf(seat);
     if (side !== s.toPlay) return { ok: false, error: "还没轮到你" };
     const mv = xiangqiParseIccs(move);
     if (!mv) return { ok: false, error: `看不懂这步：${move}（格式如 h2e2）` };
@@ -162,29 +168,29 @@ export const xiangqi: LegacyGameModule<XiangqiState, XiangqiView> = {
     return { ok: true, state, log: text };
   },
   waitingOn(s) {
-    return s.result ? [] : [actorOf(s, s.toPlay)];
+    return s.result ? [] : [seatOf(s.toPlay)];
   },
   outcome(s) {
     if (!s.result) return null;
-    return { winner: s.result.winner === "draw" ? "draw" : actorOf(s, s.result.winner), text: s.result.text };
+    return { winners: s.result.winner === "draw" ? [] : [seatOf(s.result.winner)], text: s.result.text };
   },
-  seats(s) {
-    return s.humanColor === "r" ? { human: "红方", ai: "黑方" } : { human: "黑方", ai: "红方" };
-  },
-  view(s) {
+  seatLabels: () => [SIDE_ZH.r, SIDE_ZH.b],
+  view(s, viewer) {
     const check = !s.result && xiangqiInCheck(s.board, s.toPlay);
     return {
       ...s,
+      you: viewer === 0 || viewer === 1 ? sideOf(viewer) : null,
       check,
       checkSq: check ? xiangqiGeneral(s.board, s.toPlay) : undefined,
       legal: s.result ? [] : xiangqiLegalPairs(s.board, s.toPlay).map(([f, t]) => xiangqiIccs(f, t)),
     };
   },
-  describe(s, names) {
-    const ai = colorOf(s, "ai");
+  describe(s, seat, names) {
+    const ai = sideOf(seat);
+    const opp = names[1 - seat] ?? "Your opponent";
     const sideName = (c: XiangqiSide) => (c === "r" ? "Red (uppercase, moves first)" : "Black (lowercase)");
     const out = [
-      `You are ${sideName(ai)}. ${names.human} is ${sideName(other(ai))}.`,
+      `You are ${sideName(ai)}. ${opp} is ${sideName(other(ai))}. Your back rank is rank ${ai === "r" ? "0 (bottom of the diagram)" : "9 (top of the diagram)"}; you move ${ai === "r" ? "up" : "down"} the ranks.`,
       `Plies played: ${s.moves}. Plies since last capture: ${s.quiet} (draw at ${XIANGQI_DRAW_PLIES}).`,
     ];
     if (s.last) {
@@ -195,9 +201,9 @@ export const xiangqi: LegacyGameModule<XiangqiState, XiangqiView> = {
     if (s.captured.length) out.push(`Captured so far: ${s.captured.join(" ")}.`);
     if (s.result) out.push(`Game over: ${s.result.text}.`);
     else {
-      const toMove = s.toPlay === ai ? "you" : names.human;
+      const toMove = s.toPlay === ai ? "you" : opp;
       out.push(`Side to move: ${s.toPlay === "r" ? "Red" : "Black"} (${toMove}).`);
-      if (xiangqiInCheck(s.board, s.toPlay)) out.push(s.toPlay === ai ? "YOUR GENERAL IS IN CHECK: you must get out of check." : `${names.human}'s general is in check.`);
+      if (xiangqiInCheck(s.board, s.toPlay)) out.push(s.toPlay === ai ? "YOUR GENERAL IS IN CHECK: you must get out of check." : `${opp}'s general is in check.`);
     }
     out.push("", xiangqiBoardText(s.board), "", LEGEND);
     if (!s.result && s.toPlay === ai) {
@@ -217,5 +223,8 @@ export const xiangqi: LegacyGameModule<XiangqiState, XiangqiView> = {
       if (mates.length) out.push(`CHECKMATE available: ${mates.map(([f, t]) => xiangqiIccs(f, t)).join(" ")}.`);
     }
     return out.join("\n");
+  },
+  bot(s, seat) {
+    return xiangqiBotMove(s.board, sideOf(seat));
   },
 };
