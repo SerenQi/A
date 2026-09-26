@@ -69,39 +69,5 @@ export interface GameModule<S = any, V = any> {
   bot?(state: S, seat: Seat): string;
 }
 
-/* ---------------------------------------------------------------------------------------
- * Legacy two-player contract. Modules still written against it are adapted automatically
- * (see games/legacy.ts): the "human" key is seat 0 and the "ai" key is seat 1.
- * ------------------------------------------------------------------------------------- */
-
+/** Go's internal record still names its two sides "human" (black, seat 0) and "ai" (white, seat 1). */
 export type Actor = "human" | "ai";
-export const otherActor = (a: Actor): Actor => (a === "human" ? "ai" : "human");
-
-export interface LegacyCreateContext {
-  seed: number;
-  humanFirst: boolean;
-  options: Record<string, string>;
-}
-
-export interface LegacyOutcome {
-  winner: Actor | "draw";
-  text: string;
-}
-
-export interface LegacyGameModule<S = any, V = any> {
-  kind: GameKind;
-  name: { zh: string; en: string };
-  family: "棋" | "牌" | "骰";
-  blurb: string;
-  ready: boolean;
-  options: OptionSpec[];
-  rules: string;
-  moveHelp: string;
-  create(ctx: LegacyCreateContext): S;
-  apply(state: S, actor: Actor, move: string): MoveResult<S>;
-  waitingOn(state: S): Actor[];
-  outcome(state: S): LegacyOutcome | null;
-  seats(state: S): Record<Actor, string>;
-  view(state: S, viewer: Actor): V;
-  describe(state: S, names: Record<Actor, string>): string;
-}

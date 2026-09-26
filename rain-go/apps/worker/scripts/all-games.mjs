@@ -1,6 +1,7 @@
-// End-to-end check of every game through the real Worker and MCP tools: `pnpm all-games` while the dev server runs.
-// For each game the AI moves first over MCP, the human answers over HTTP where it is their turn,
-// and card games are checked for hidden-information leaks in the human's web view.
+// End-to-end check of every game through the real Worker, HTTP API and MCP tools: `pnpm all-games`
+// while the dev server runs. Each game is opened at its default table (human, AI, bots as needed);
+// the human and the AI each make moves; card games are checked for hidden-information leaks
+// between seats, towards spectators and towards the AI.
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 
@@ -18,68 +19,126 @@ const call = async (name, args = {}) => {
   const r = await client.callTool({ name, arguments: args });
   return { text: r.content.map((c) => c.text).join("\n"), isError: Boolean(r.isError) };
 };
-const human = async (id, move) => {
-  const r = await fetch(`${BASE}/api/games/${id}/actions`, {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${TOKEN}` },
-    body: JSON.stringify({ type: "move", move }),
-  });
+const http = async (path, { method = "GET", body, seat, owner = true } = {}) => {
+  const headers = { "content-type": "application/json" };
+  if (owner) headers.authorization = `Bearer ${TOKEN}`;
+  if (seat) headers["x-seat"] = seat;
+  const r = await fetch(`${BASE}${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined });
   return { status: r.status, body: await r.json() };
 };
-const webView = (id) => fetch(`${BASE}/api/games/${id}`).then((r) => r.json()).then((j) => j.match);
+const viewOf = (id, seat) => http(`/api/games/${id}`, { seat, owner: false }).then((r) => r.body.match);
+const humanMove = (id, seat, move) => http(`/api/games/${id}/actions`, { method: "POST", seat, owner: false, body: { type: "move", move } });
 
-// First AI move (the AI takes the first seat) and a reply for the human, per game.
-const PLAN = {
-  go: { ai: () => "E5", human: "E4" },
-  gomoku: { ai: () => "H8", human: "H9" },
-  reversi: { ai: () => "d3", human: "c5" },
-  chess: { ai: () => "e2e4", human: "e7e5" },
-  xiangqi: { ai: () => "h2e2", human: "h9g7" },
-  poker: { ai: () => "call", human: "check" },
-  paodekuai: { ai: (t) => /^- "([^"]+)"/m.exec(t)?.[1], human: "pass" },
-  monopoly: { ai: () => "roll" },
-  aeroplane: { ai: () => "roll" },
+// Candidate moves per game, tried in order until one is legal. Legal plays listed in the AI's
+// text (lines like - "3 3") and simple fallbacks are appended at run time.
+const CANDIDATES = {
+  go: ["E5", "E4", "D4", "pass"],
+  gomoku: ["H8", "H9", "J9", "G7"],
+  reversi: ["d3", "c5", "c4", "e6", "f5", "f4", "e3", "d6"],
+  chess: ["e2e4", "e7e5", "g1f3", "b8c6"],
+  xiangqi: ["h2e2", "h9g7", "b2e2", "b9c7"],
+  poker: ["check", "call"],
+  paodekuai: [],
+  monopoly: ["roll", "skip", "end"],
+  aeroplane: ["roll", "launch", "move"],
+  doudizhu: ["bid 1", "pass"],
+};
+const humanCandidates = (kind, view) => {
+  const v = view.view ?? {};
+  const out = [...CANDIDATES[kind]];
+  if (Array.isArray(v.hints) && v.hints.length) out.unshift([v.hints[0]].flat().join(" "));
+  if (Array.isArray(v.legalBids) && v.legalBids.length) out.unshift(`bid ${v.legalBids[0]}`);
+  return [...out, "pass"];
+};
+const aiCandidates = (kind, text) => {
+  const listed = [...text.matchAll(/^\s*- "([^"]+)"/gm)].map((m) => m[1]);
+  return [...listed.slice(0, 3), ...CANDIDATES[kind], "pass"];
 };
 
 const types = await call("list_game_types");
 const kinds = [...types.text.matchAll(/^## (\w+) ·/gm)].map((m) => m[1]);
-check(kinds.length === 9 && Object.keys(PLAN).every((k) => kinds.includes(k)), `list_game_types offers all 9 games (${kinds.join(", ")})`);
+check(kinds.length === 10 && Object.keys(CANDIDATES).every((k) => kinds.includes(k)), `list_game_types offers all 10 games (${kinds.join(", ")})`);
 
-for (const kind of Object.keys(PLAN)) {
-  const plan = PLAN[kind];
-  const created = await call("new_game", { kind, human_first: false, human_name: "Seren", ai_name: "Claude" });
+for (const kind of Object.keys(CANDIDATES)) {
+  const created = await call("new_game", { kind });
   const id = /Game (\w+) ·/.exec(created.text)?.[1];
-  check(id && created.text.includes("Status: YOUR TURN"), `${kind}: created with the AI to move`);
+  const link = /\(human\): send them this link: (\S+)/.exec(created.text)?.[1];
+  const hTok = link && new URL(link).searchParams.get("t");
+  const seatsLine = /Seats: (.*)/.exec(created.text)?.[1] ?? "";
+  check(id && hTok, `${kind}: default table created (${seatsLine})`);
+  if (!id || !hTok) continue;
 
-  // Hidden information: nothing the AI holds may reach the human's page.
-  if (kind === "poker") {
-    const cards = /Your hole cards: ([2-9TJQKA][shdc]) ([2-9TJQKA][shdc])/.exec(created.text)?.slice(1) ?? [];
-    const v = JSON.stringify(await webView(id));
-    check(cards.length === 2 && cards.every((c) => !v.includes(`"${c}"`)), `${kind}: web view hides the AI's hole cards (${cards.join(" ")})`);
+  let humanMoves = 0;
+  let aiMoves = 0;
+  for (let round = 0; round < 8 && (humanMoves < 2 || aiMoves < 2); round++) {
+    const v = await viewOf(id, hTok);
+    if (v.status.outcome) break;
+    if (v.status.waitingOn.includes(0)) {
+      for (const mv of humanCandidates(kind, v)) {
+        if ((await humanMove(id, hTok, mv)).status === 200) {
+          humanMoves++;
+          break;
+        }
+      }
+    }
+    const st = await call("get_state", { game_id: id });
+    if (st.text.includes("Status: YOUR TURN")) {
+      for (const mv of aiCandidates(kind, st.text)) {
+        if (!(await call("play", { game_id: id, move: mv })).isError) {
+          aiMoves++;
+          break;
+        }
+      }
+    }
   }
-  if (kind === "paodekuai") {
-    const hand = /Your hand \(16 cards\): (.*)/.exec(created.text)?.[1] ?? "";
-    const aiCards = [...hand.matchAll(/([♠♥♣♦])(10|[2-9JQKA])/g)].map((m) => ({ suit: m[1], rank: m[2] }));
-    const view = await webView(id);
-    const mine = JSON.stringify(view.view.hand ?? view.view);
-    const letters = { "♠": "S", "♥": "H", "♣": "C", "♦": "D" };
-    const leaked = aiCards.filter((c) => mine.includes(`"${letters[c.suit]}${c.rank}"`) || mine.includes(`"${c.suit}${c.rank}"`));
-    check(aiCards.length === 16 && leaked.length === 0, `${kind}: web view contains none of the AI's 16 cards`);
-    check(!JSON.stringify(view).includes("rng"), `${kind}: web view has no RNG state`);
-  }
+  const final = await viewOf(id, hTok);
+  const aiSeat = final.seats.findIndex((s) => s.kind === "ai");
+  check(humanMoves > 0 && aiMoves > 0 && final.log.some((l) => l.seat === aiSeat), `${kind}: human moved ${humanMoves}×, AI moved ${aiMoves}× (log: ${final.log.slice(-4).map((l) => l.move).join(" | ")})`);
+  check(final.me === 0 && (await viewOf(id)).me === null, `${kind}: seat token gives seat 0's view, no token gives a spectator view`);
+}
 
-  const aiMove = plan.ai(created.text);
-  const played = await call("play", { game_id: id, move: aiMove });
-  check(!played.isError, `${kind}: AI plays "${aiMove}"${played.isError ? ` → ${played.text.slice(0, 120)}` : ""}`);
+// --- Hidden information in card games ---
+const SUIT = { S: "♠", H: "♥", C: "♣", D: "♦" };
+const handOf = (v) => (Array.isArray(v.view?.hole) ? v.view.hole : Array.isArray(v.view?.hand) ? v.view.hand : []);
+for (const kind of ["poker", "paodekuai", "doudizhu"]) {
+  const seats = [{ kind: "human", me: true, name: "Seren" }, { kind: "human", name: "Mori" }, ...(kind === "poker" ? [] : [{ kind: "bot" }])];
+  const g = await http("/api/games", { method: "POST", body: { kind, seats } });
+  const id = g.body.match.id;
+  const t0 = g.body.token;
+  const t1 = new URL(g.body.invites[1].link).searchParams.get("t");
+  const [v0, v1, spec] = [await viewOf(id, t0), await viewOf(id, t1), await viewOf(id)];
+  const h0 = handOf(v0);
+  const h1 = handOf(v1);
+  const leaks = (cards, json) => cards.filter((c) => json.includes(`"${c}"`));
+  check(h0.length > 0 && h1.length > 0, `${kind}: both humans see their own cards (${h0.length} and ${h1.length})`);
+  check(!leaks(h0, JSON.stringify(v1)).length && !leaks(h1, JSON.stringify(v0)).length, `${kind}: neither human's page contains the other's cards`);
+  check(!leaks([...h0, ...h1], JSON.stringify(spec)).length && handOf(spec).length === 0, `${kind}: spectators see no hand`);
 
-  if (plan.human) {
-    const res = await human(id, plan.human);
-    check(res.status === 200, `${kind}: human answers "${plan.human}"${res.status !== 200 ? ` → ${JSON.stringify(res.body).slice(0, 160)}` : ""}`);
-  }
-  const state = await call("get_state", { game_id: id });
-  check(!state.isError && state.text.includes(`Game ${id}`), `${kind}: get_state describes the game`);
-  const v = await webView(id);
-  check(v.kind === kind && v.log.length >= 1 && v.status && v.seats, `${kind}: web view has status, seats and a log (${v.log.map((l) => l.move).join(" | ")})`);
+  // The AI's text must not contain the human's cards.
+  const withAi = await call("new_game", { kind, seats: ["human", "ai", ...(kind === "poker" ? [] : ["bot"])] });
+  const aiId = /Game (\w+) ·/.exec(withAi.text)?.[1];
+  const hLink = /\(human\): send them this link: (\S+)/.exec(withAi.text)?.[1];
+  const hv = await viewOf(aiId, new URL(hLink).searchParams.get("t"));
+  const humanCards = handOf(hv);
+  const text = (await call("get_state", { game_id: aiId })).text;
+  const forms = humanCards.flatMap((c) => [c, /^[SHCD]/.test(c) ? `${SUIT[c[0]]}${c.slice(1)}` : c]);
+  const leaked = kind === "poker" ? forms.filter((c) => new RegExp(`\\b${c}\\b`).test(text.split("Your hole cards:")[0] + text.split(/Your hole cards: \S+ \S+/)[1])) : forms.filter((c) => /^[♠♥♣♦]/.test(c) && text.includes(c));
+  check(humanCards.length > 0 && leaked.length === 0, `${kind}: the AI's text contains none of the human's ${humanCards.length} cards`);
+}
+
+// --- WebSocket pushes each socket its own seat's view ---
+{
+  const g = await http("/api/games", { method: "POST", body: { kind: "gomoku", seats: [{ kind: "human", me: true }, { kind: "human" }] } });
+  const t1 = new URL(g.body.invites[1].link).searchParams.get("t");
+  const got = await new Promise((resolve) => {
+    const ws = new WebSocket(`${BASE.replace("http", "ws")}/api/games/${g.body.match.id}/ws?t=${t1}`);
+    ws.onmessage = (e) => {
+      resolve(JSON.parse(e.data).match);
+      ws.close();
+    };
+    setTimeout(() => resolve(null), 5000);
+  });
+  check(got?.me === 1 && got.seats[1].joined, "a WebSocket with a seat token gets that seat's view and marks the seat joined");
 }
 
 await client.close();
