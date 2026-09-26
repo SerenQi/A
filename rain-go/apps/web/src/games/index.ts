@@ -1,6 +1,7 @@
 import type { GameKind } from "@rain-go/engine";
 import { aeroplaneUI } from "./aeroplane";
 import { chessUI } from "./chess";
+import { doudizhuUI } from "./doudizhu";
 import { goUI } from "./go";
 import { gomokuUI } from "./gomoku";
 import { monopolyUI } from "./monopoly";
@@ -20,4 +21,5 @@ export const UIS: Record<GameKind, GameUI> = {
   paodekuai: paodekuaiUI,
   monopoly: monopolyUI,
   aeroplane: aeroplaneUI,
+  doudizhu: doudizhuUI,
 };

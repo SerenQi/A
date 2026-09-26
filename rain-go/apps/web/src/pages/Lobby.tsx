@@ -23,6 +23,7 @@ export const GLYPH: Record<GameKind, string> = {
   paodekuai: "跑",
   monopoly: "⚄",
   aeroplane: "✈",
+  doudizhu: "斗",
 };
 
 /** Symbol glyphs render smaller than CJK characters at the same size. */
