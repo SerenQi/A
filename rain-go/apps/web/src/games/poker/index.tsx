@@ -1,7 +1,7 @@
 import { otherActor, pokerBestHand, pokerHandNameZh, pokerStreetZh, type Actor, type PokerActionEntry, type PokerView } from "@rain-go/engine";
 import { useEffect, useState, type CSSProperties } from "react";
 import type { BoardProps, GameUI } from "../types";
-import { PokerCard, PokerCardBack, PokerCardSlot, PokerDisc, pokerCardLabel } from "./Cards";
+import { PokerCard, PokerCardBack, PokerCardSlot, PokerDisc } from "./Cards";
 
 const currentBet = (v: PokerView) => Math.max(v.bets.human, v.bets.ai);
 
@@ -69,7 +69,7 @@ function Seat({ who, v, name, cards, note }: { who: Actor; v: PokerView; name: s
           <span className="shrink-0 font-bold tracking-tight" style={{ fontSize: fz(0.46, 15, 34), lineHeight: 1.1 }}>
             {v.stacks[who]}
           </span>
-          {allIn && (
+          {allIn && !note?.startsWith("全下") && (
             <span className="shrink-0 text-accent" style={{ fontSize: fz(0.28, 11, 17) }}>
               全下
             </span>
@@ -133,7 +133,7 @@ function Board({ match, view: v, canAct, send, compact }: BoardProps<PokerView>)
   };
   const confirm = () => send1(amount >= v.maxRaiseTo ? "allin" : `${raiseKind ?? "raise"} ${amount}`);
 
-  const btn = "btn flex-1 !min-h-[40px] !px-2 text-[0.98rem] lg:!min-h-[48px]";
+  const btn = "btn flex-1 whitespace-nowrap !min-h-[40px] !px-2 text-[0.98rem] lg:!min-h-[48px]";
   const line = { fontSize: fz(0.34, 12, 20), lineHeight: 1.2 } as CSSProperties;
   const ch = compact ? "clamp(24px, min(calc(100cqh / 4.4), 21cqw), 104px)" : "clamp(40px, min(calc(100cqh / 4.6), 15cqw), 120px)";
 
@@ -150,7 +150,7 @@ function Board({ match, view: v, canAct, send, compact }: BoardProps<PokerView>)
             <div className="flex items-center gap-1.5" style={line}>
               <PokerDisc dark size="1em" />
               <span className="text-muted">底池</span>
-              <span className="font-bold">{v.pot}</span>
+              <span className="font-bold">{v.over && lh ? lh.pot : v.pot}</span>
               <span className="text-faint">·</span>
               <span className="text-muted">{v.over ? "结束" : pokerStreetZh[v.street]}</span>
             </div>
@@ -230,7 +230,7 @@ function Board({ match, view: v, canAct, send, compact }: BoardProps<PokerView>)
               弃牌
             </button>
             <button className={`${btn} btn-ink`} disabled={!myTurn} onClick={() => send1(v.toCall > 0 ? "call" : "check")}>
-              {!myTurn ? "等待" : v.toCall > 0 ? (v.toCall >= v.stacks[me] ? `全下跟注 ${v.toCall}` : `跟注 ${v.toCall}`) : "过牌"}
+              {!myTurn ? "等待" : v.toCall > 0 ? (v.toCall >= v.stacks[me] ? `全下 ${v.toCall}` : `跟注 ${v.toCall}`) : "过牌"}
             </button>
             {myTurn && canRaise && !raiseKind ? (
               <button className={`${btn} btn-glass`} onClick={() => send1("allin")}>
@@ -261,7 +261,7 @@ export const pokerUI: GameUI<PokerView> = {
   status: (v) => {
     if (v.over) return null;
     const street = pokerStreetZh[v.street];
-    if (v.toAct === v.viewer) return v.toCall > 0 ? `到你了 · 跟注 ${v.toCall}` : `到你了 · ${street} · 底池 ${v.pot}`;
+    if (v.toAct === v.viewer) return v.toCall > 0 ? `到你了 · 跟注 ${v.toCall}` : `到你了 · 底池 ${v.pot}`;
     return `${street} · 底池 ${v.pot}`;
   },
   badge: (v) => ({ value: String(v.stacks[v.viewer]), label: "CHIPS" }),

@@ -56,7 +56,7 @@ function Board({ view: v, canAct, send, toast, compact }: BoardProps<PaodekuaiVi
   }
   const rise = Math.round(cardH * 0.16);
   const handStep = pdkStep(n, cardW, W, cardW * 0.58);
-  const handWidth = cardW + handStep * Math.max(0, n - 1);
+  const handWidth = n ? cardW + handStep * (n - 1) : W;
   const labelH = compact ? 18 : 26;
   const trickH = clamp(Math.min(table.h - labelH - 8, cardH * 1.05), 30, 150);
   const trickW = Math.round(trickH * 0.7);
@@ -152,7 +152,7 @@ function Board({ view: v, canAct, send, toast, compact }: BoardProps<PaodekuaiVi
             </button>
           );
         })}
-        {!n && <div className="grid h-full place-items-center text-muted">手牌出完了</div>}
+        {!n && <div className="grid h-full place-items-center whitespace-nowrap text-muted">手牌出完了</div>}
       </div>
 
       {/* Controls */}

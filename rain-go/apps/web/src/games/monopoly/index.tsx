@@ -235,7 +235,7 @@ function Popover({ sp, v, canAct, send, onClose }: { sp: MonopolySpaceView; v: M
     tax: `交 ${sp.tax}。`,
   };
   return (
-    <div className="glass z-20 !rounded-[18px] text-ink" style={{ ...pos, position: "absolute", padding: cq(2.6) }} onClick={(e) => e.stopPropagation()}>
+    <div className="glass z-20 !rounded-[18px] text-ink" style={{ ...pos, position: "absolute", padding: cq(2.6), background: "linear-gradient(165deg, rgb(252 252 250 / 0.96), rgb(238 238 235 / 0.93))" }} onClick={(e) => e.stopPropagation()}>
       <div className="flex items-baseline justify-between" style={{ gap: cq(1) }}>
         <span className="font-semibold leading-none" style={{ fontSize: cq(4.6) }}>
           {sp.name}
