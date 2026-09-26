@@ -110,11 +110,11 @@ export function Lobby() {
   const create = async () => {
     setBusy(true);
     try {
-      const firstAi = seats.indexOf("ai");
+      const firstOther = seats.findIndex((x) => x !== "me");
       const specs: SeatSpec[] = seats.map((s, i) => ({
         kind: s === "me" ? "human" : s,
         me: s === "me",
-        name: s === "me" ? humanName.trim() || undefined : i === firstAi ? aiName.trim() || undefined : undefined,
+        name: s === "me" ? humanName.trim() || undefined : i === firstOther ? aiName.trim() || undefined : undefined,
       }));
       const res = await api.createGame({ kind, options, seats: specs });
       if (res.token) prefs.setSeatToken(res.match.id, res.token);
@@ -214,14 +214,14 @@ export function Lobby() {
                     －
                   </button>
                 )}
-                <button className={`${seg} shrink-0 !px-2.5`} aria-label="换先手" onClick={() => setSeats([...seats.slice(1), seats[0]!])}>
-                  ↻
+                <button className={`${seg} shrink-0 !px-2.5 text-sm`} aria-label="换先手" onClick={() => setSeats([...seats.slice(1), seats[0]!])}>
+                  轮换
                 </button>
               </div>
             </div>
             <div className="relative grid grid-cols-2 gap-2.5 lg:gap-3">
               <input className="field !min-h-[42px] pr-6 lg:!min-h-[46px]" value={humanName} onChange={(e) => setHumanName(e.target.value)} placeholder="你的名字" maxLength={40} list="recent-names" />
-              <input className="field !min-h-[42px] pl-6 lg:!min-h-[46px]" value={aiName} onChange={(e) => setAiName(e.target.value)} placeholder="AI 的名字" maxLength={40} list="recent-names" />
+              <input className="field !min-h-[42px] pl-6 lg:!min-h-[46px]" value={aiName} onChange={(e) => setAiName(e.target.value)} placeholder={`${CHOICE_ZH[seats.find((x) => x !== "me") ?? "ai"]}的名字`} maxLength={40} list="recent-names" />
               <button
                 type="button"
                 aria-label="互换名字"
