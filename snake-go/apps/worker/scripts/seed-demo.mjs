@@ -1,0 +1,31 @@
+// Seeds a demo game with a couple of long snakes and a capture: `pnpm seed` while the dev server runs.
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
+
+const BASE = process.env.BASE ?? "http://127.0.0.1:8787";
+const TOKEN = process.env.TOKEN ?? "devtoken";
+const client = new Client({ name: "seed", version: "0" });
+await client.connect(new StreamableHTTPClientTransport(new URL(`${BASE}/mcp/${TOKEN}`)));
+
+const created = await client.callTool({ name: "go_new_game", arguments: { size: 9, ai_color: "white", human_name: "Seren", ai_name: "Claude" } });
+const id = /Game (\w+) ·/.exec(created.content[0].text)[1];
+const COLS = "ABCDEFGHJ";
+const point = (gtp) => (9 - Number(gtp.slice(1))) * 9 + COLS.indexOf(gtp[0]);
+
+const seq = ["C3", "G7", "D3", "G6", "E3", "F6", "E4", "E6", "E5", "D6", "G3", "J1", "H1", "C7", "J2", "C6"];
+for (const [i, mv] of seq.entries()) {
+  if (i % 2 === 0) {
+    const r = await fetch(`${BASE}/api/games/${id}/actions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify({ type: "play", point: point(mv) }),
+    });
+    if (!r.ok) throw new Error(`human ${mv}: ${await r.text()}`);
+  } else {
+    const say = mv === "C6" ? "你的蛇吃掉了我的小蛇，我要绕回来咬你了" : undefined;
+    const r = await client.callTool({ name: "go_play", arguments: { game_id: id, move: mv, say } });
+    if (r.isError) throw new Error(`ai ${mv}: ${r.content[0].text}`);
+  }
+}
+await client.close();
+console.log(`${BASE}/g/${id}`);
