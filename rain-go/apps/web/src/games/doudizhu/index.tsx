@@ -31,7 +31,7 @@ function SeatPanel({ v, match, seat, side, compact, me }: { v: DdzView; match: M
           {thinking && <span className={`pulse-dot shrink-0 text-muted ${compact ? "text-[0.55rem]" : "text-[0.75rem]"}`}>●</span>}
         </div>
         <div className={`flex items-center gap-1 ${right ? "flex-row-reverse" : ""}`} aria-label={`剩 ${count} 张`}>
-          <span className={`flex items-baseline gap-0.5 ${right ? "flex-row-reverse" : ""}`}>
+          <span className="flex items-baseline gap-0.5">
             <span className={`font-serif font-bold leading-none ${compact ? "text-[1rem]" : "text-[1.6rem]"} ${count <= 2 && v.phase === "play" ? "text-accent" : ""}`}>{count}</span>
             <span className="text-[0.68rem] text-muted">张</span>
           </span>
@@ -100,7 +100,7 @@ function Board({ match, view: v, me, canAct, send, toast, compact }: BoardProps<
   const handWidth = n ? cardW + handStep * (n - 1) : W;
   const panelW = clamp(Math.round(W * 0.3), 96, 230);
   const labelH = compact ? 14 : 24;
-  const bottomW = compact ? 15 : clamp(Math.round(H * 0.045), 20, 34);
+  const bottomW = compact ? 15 : clamp(Math.round(H * 0.06), 20, 40);
   const bottomH = Math.round(bottomW * 1.42);
 
   const toggle = (c: string) => {
