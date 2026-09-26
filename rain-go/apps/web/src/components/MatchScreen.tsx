@@ -208,7 +208,7 @@ export function MatchScreen({
         </motion.section>
         {stats.length > 0 && (
           <motion.section {...card} className="glass area-stats px-7 py-6">
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(76px,1fr))] gap-4">
               {stats.map((s) => (
                 <Stat key={s.label} label={s.label} value={s.value} />
               ))}
