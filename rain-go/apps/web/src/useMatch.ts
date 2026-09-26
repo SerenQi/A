@@ -2,8 +2,8 @@ import type { MatchView } from "@rain-go/engine";
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "./api";
 
-/** Loads a match and keeps it live over a WebSocket. The server only ever sends the human's view. */
-export function useMatch(id: string) {
+/** Loads a match and keeps it live over a WebSocket. The server only sends the view of the seat `seatToken` holds. */
+export function useMatch(id: string, seatToken: string) {
   const [match, setMatchRaw] = useState<MatchView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [live, setLive] = useState(false);
@@ -22,11 +22,11 @@ export function useMatch(id: string) {
     let retry = 0;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
-    api.getGame(id).then(setMatch, (e: unknown) => setError(e instanceof ApiError && e.status === 404 ? "找不到这局" : "加载失败"));
+    api.getGame(id, seatToken || undefined).then(setMatch, (e: unknown) => setError(e instanceof ApiError && e.status === 404 ? "找不到这局" : "加载失败"));
 
     const connect = () => {
       const proto = location.protocol === "https:" ? "wss" : "ws";
-      ws = new WebSocket(`${proto}://${location.host}/api/games/${id}/ws`);
+      ws = new WebSocket(`${proto}://${location.host}/api/games/${id}/ws${seatToken ? `?t=${encodeURIComponent(seatToken)}` : ""}`);
       ws.onopen = () => {
         setLive(true);
         retry = 0;
@@ -49,7 +49,7 @@ export function useMatch(id: string) {
       clearInterval(ping);
       ws?.close();
     };
-  }, [id, setMatch]);
+  }, [id, seatToken, setMatch]);
 
   return { match, setMatch, error, live, syncedAt };
 }

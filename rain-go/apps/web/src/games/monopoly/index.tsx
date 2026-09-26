@@ -8,7 +8,7 @@ const T = 100 / 7;
 const cq = (n: number) => `${n}cqw`;
 
 const other = (a: Actor): Actor => (a === "human" ? "ai" : "human");
-const nameOf = (m: MatchView<MonopolyView>, a: Actor) => (a === "human" ? m.humanName : m.aiName);
+const nameOf = (m: MatchView<MonopolyView>, a: Actor) => m.seats[a === "human" ? 0 : 1]?.name ?? "";
 
 /** Small glossy disc (ink or milk) drawn with the shared drop gradients. */
 function Disc({ ink, size, className, jailed }: { ink: boolean; size: string; className?: string; jailed?: boolean }) {

@@ -1,5 +1,5 @@
 import { COLUMNS, starPoints, toGtp } from "./coords";
-import { actorColor, phaseOf, resultOf, waitingOn } from "./record";
+import { phaseOf, resultOf } from "./record";
 import { findChains } from "./chains";
 import { areaScore } from "./score";
 import { replay } from "./state";
@@ -30,17 +30,19 @@ export function boardText(r: GameRecord): string {
   return lines.join("\n");
 }
 
-/** Go position and status written for an AI player. Names come from the record. */
-export function describeGo(r: GameRecord): string {
+/** Go position and status from the point of view of `you` (default: white). `names` = [black, white]. */
+export function describeGo(r: GameRecord, you: 1 | 2 = 2, names?: [string, string]): string {
   const s = replay(r.size, r.moves);
-  const aiColor = actorColor(r, "ai");
+  const aiColor = you;
+  const nameOf = (c: 1 | 2) => (names ? names[c - 1]! : c === r.humanColor ? r.humanName : r.aiName);
   const phase = phaseOf(r, s);
   const g = (p: number) => toGtp(p, r.size);
-  const name = (c: 1 | 2) => (c === aiColor ? `${r.aiName} (you)` : r.humanName);
+  const name = (c: 1 | 2) => (c === aiColor ? `${nameOf(c)} (you)` : nameOf(c));
   const out: string[] = [];
 
   out.push(`${r.size}x${r.size} · komi ${r.komi} · Chinese area scoring, positional superko`);
-  out.push(`You play ${colorName(aiColor)} (${symbol(aiColor)}). ${r.humanName} plays ${colorName(r.humanColor)} (${symbol(r.humanColor)}).`);
+  const opp = aiColor === 1 ? 2 : 1;
+  out.push(`You play ${colorName(aiColor)} (${symbol(aiColor)}). ${nameOf(opp)} plays ${colorName(opp)} (${symbol(opp)}).`);
 
   const plays = r.moves.filter((m) => m.k === "play" || m.k === "pass").length;
   out.push(`Phase: ${phase}. Moves played: ${plays}. Captures: black ${s.captures[1]}, white ${s.captures[2]}.`);
@@ -52,9 +54,8 @@ export function describeGo(r: GameRecord): string {
     out.push(`Last: ${colorName(last.c)} ${what}${cap}.`);
   }
 
-  const waits = waitingOn(r, s);
   if (phase === "playing") {
-    out.push(`To play: ${colorName(s.toPlay)}, ${waits[0] === "ai" ? "that's YOU." : `waiting for ${r.humanName}.`}`);
+    out.push(`To play: ${colorName(s.toPlay)}, ${s.toPlay === aiColor ? "that's YOU." : `waiting for ${nameOf(s.toPlay)}.`}`);
   } else if (phase === "scoring") {
     const est = areaScore(s.cells, r.size, r.dead, r.komi);
     out.push(

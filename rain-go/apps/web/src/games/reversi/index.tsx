@@ -19,7 +19,7 @@ function Board({ view: s, canAct, send, toast }: BoardProps<ReversiView>) {
     onError: toast,
   });
   const flipped = new Set(s.flipped);
-  const mine = s.humanColor;
+  const mine = s.you ?? s.toPlay;
 
   return (
     <svg ref={place.svgRef} viewBox="-0.55 -0.55 9.1 9.1" className="block h-full w-full touch-manipulation select-none" {...place.handlers} role="grid" aria-label="黑白棋棋盘">
@@ -76,7 +76,7 @@ function Board({ view: s, canAct, send, toast }: BoardProps<ReversiView>) {
 export const reversiUI: GameUI<ReversiView> = {
   shape: "square",
   Board,
-  status: (s, m) => (s.passed && !m.status.outcome ? `${s.passed === s.humanColor ? "你" : m.aiName}无子可下，跳过一手` : null),
+  status: (s, m) => (s.passed && !m.status.outcome ? `${s.passed === s.you ? "你" : (m.seats[s.passed - 1]?.name ?? "")}无子可下，跳过一手` : null),
   badge: (s) => ({ value: `${count(s, 1)}:${count(s, 2)}`, label: "黑 : 白" }),
   stats: (s) => [
     { label: "黑子", value: String(count(s, 1)) },

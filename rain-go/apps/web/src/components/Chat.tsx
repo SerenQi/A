@@ -1,8 +1,9 @@
-import type { ChatMessage } from "@rain-go/engine";
+import type { MatchChat, Seat } from "@rain-go/engine";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { IconSend } from "./icons";
 
-export function ChatList({ chat, me, className = "" }: { chat: ChatMessage[]; me: "human" | "ai"; className?: string }) {
+export function ChatList({ chat, me, names, className = "" }: { chat: MatchChat[]; me: Seat | null; names: string[]; className?: string }) {
+  const many = names.length > 2 || me === null;
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (box.current) box.current.scrollTop = box.current.scrollHeight;
@@ -11,8 +12,11 @@ export function ChatList({ chat, me, className = "" }: { chat: ChatMessage[]; me
     <div ref={box} className={`space-y-2 overflow-y-auto ${className}`}>
       {chat.length === 0 && <div className="text-muted">还没有悄悄话。</div>}
       {chat.map((m, i) => (
-        <div key={i} className={`flex ${m.from === me ? "justify-end" : ""}`}>
-          <div className={`max-w-[85%] rounded-2xl px-4 py-2 text-[1rem] ${m.from === me ? "bg-ink text-white" : "border border-white/80 bg-white/50"}`}>{m.text}</div>
+        <div key={i} className={`flex ${m.seat === me ? "justify-end" : ""}`}>
+          <div className={`max-w-[85%] rounded-2xl px-4 py-2 text-[1rem] ${m.seat === me ? "bg-ink text-white" : "border border-white/80 bg-white/50"}`}>
+            {many && m.seat !== me && <div className="text-xs text-muted">{names[m.seat]}</div>}
+            {m.text}
+          </div>
         </div>
       ))}
     </div>

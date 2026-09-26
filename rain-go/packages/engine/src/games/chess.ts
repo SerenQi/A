@@ -1,4 +1,4 @@
-import type { Actor, GameModule } from "../match/types";
+import type { Actor, LegacyGameModule } from "../match/types";
 
 /**
  * Standard chess. White moves first; `humanFirst` gives the human White.
@@ -507,7 +507,7 @@ const REASON_EN: Record<string, string> = {
   子力不足: "insufficient material (draw)",
 };
 
-export const chess: GameModule<ChessState, ChessView> = {
+export const chess: LegacyGameModule<ChessState, ChessView> = {
   kind: "chess",
   name: { zh: "国际象棋", en: "Chess" },
   family: "棋",

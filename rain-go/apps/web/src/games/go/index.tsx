@@ -20,7 +20,7 @@ function derive(r: GameRecord) {
   return { state, phase, chains, score };
 }
 
-function Board({ view: r, canAct, send, toast }: BoardProps<GameRecord>) {
+function Board({ view: r, me, canAct, send, toast }: BoardProps<GameRecord>) {
   const d = useMemo(() => derive(r), [r]);
   const dead = useMemo(() => new Set(r.dead), [r.dead]);
   return (
@@ -30,7 +30,7 @@ function Board({ view: r, canAct, send, toast }: BoardProps<GameRecord>) {
       chains={d.chains}
       moveCount={r.moves.length}
       phase={d.phase}
-      humanColor={r.humanColor}
+      humanColor={me === 1 ? 2 : 1}
       canPlay={canAct && d.phase === "playing"}
       dead={dead}
       owner={d.phase !== "playing" ? d.score?.owner : null}
@@ -41,7 +41,7 @@ function Board({ view: r, canAct, send, toast }: BoardProps<GameRecord>) {
   );
 }
 
-function Actions({ view: r, canAct, send }: BoardProps<GameRecord>) {
+function Actions({ view: r, me, canAct, send }: BoardProps<GameRecord>) {
   const phase = useMemo(() => phaseOf(r, replay(r.size, r.moves)), [r]);
   if (phase === "playing") {
     return (
@@ -51,7 +51,7 @@ function Actions({ view: r, canAct, send }: BoardProps<GameRecord>) {
     );
   }
   if (phase === "scoring") {
-    const accepted = r.accepted.includes(r.humanColor);
+    const accepted = r.accepted.includes(me === 1 ? 2 : 1);
     return (
       <>
         <button className="btn btn-ink flex-1" disabled={!canAct || accepted} onClick={() => void send("accept")}>

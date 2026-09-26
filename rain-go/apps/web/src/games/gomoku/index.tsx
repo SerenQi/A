@@ -1,4 +1,4 @@
-import { COLUMNS, toGtp, type GomokuState } from "@rain-go/engine";
+import { COLUMNS, toGtp, type GomokuView } from "@rain-go/engine";
 import { Bead, DropDefs, LastMark } from "../../components/drops";
 import { usePlacement } from "../../hooks/usePlacement";
 import type { BoardProps, GameUI } from "../types";
@@ -12,7 +12,7 @@ const STARS = [
   [11, 11],
 ];
 
-function Board({ view: s, canAct, send, toast }: BoardProps<GomokuState>) {
+function Board({ view: s, canAct, send, toast }: BoardProps<GomokuView>) {
   const n = s.size;
   const place = usePlacement({
     enabled: canAct,
@@ -27,7 +27,7 @@ function Board({ view: s, canAct, send, toast }: BoardProps<GomokuState>) {
     onError: toast,
   });
   const at = (p: number) => ({ x: p % n, y: Math.floor(p / n) });
-  const humanDark = s.humanColor === 1;
+  const humanDark = s.you !== 2;
   const win = s.winLine?.map(at);
 
   return (
@@ -89,7 +89,7 @@ function Board({ view: s, canAct, send, toast }: BoardProps<GomokuState>) {
   );
 }
 
-export const gomokuUI: GameUI<GomokuState> = {
+export const gomokuUI: GameUI<GomokuView> = {
   shape: "square",
   Board,
   badge: (s) => ({ value: String(s.moves), label: "MOVE" }),

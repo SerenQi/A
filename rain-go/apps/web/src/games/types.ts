@@ -1,11 +1,13 @@
-import type { MatchView } from "@rain-go/engine";
+import type { MatchView, Seat } from "@rain-go/engine";
 import type { FC } from "react";
 
 export interface BoardProps<V = any> {
   match: MatchView<V>;
-  /** The human's view of the game state (module.view(state, "human")). */
+  /** This screen's view of the game state: module.view(state, me). */
   view: V;
-  /** True when it is the human's turn and no request is in flight. */
+  /** The seat this screen plays, or null for a spectator. */
+  me: Seat | null;
+  /** True when it is this seat's turn and no request is in flight. */
   canAct: boolean;
   /** Sends a move in the module's move syntax. Resolves false (and toasts) on error. */
   send: (move: string) => Promise<boolean>;

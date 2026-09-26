@@ -1,5 +1,5 @@
 import { randomInt } from "../match/rng";
-import type { Actor, GameModule } from "../match/types";
+import type { Actor, LegacyGameModule } from "../match/types";
 import {
   AEROPLANE_CENTRE,
   AEROPLANE_ENTRY,
@@ -361,7 +361,7 @@ const RULES = [
   'Moves: "roll", "move 2", "launch 3" (also 掷骰, 走 2, 起飞 3).',
 ].join("\n");
 
-export const aeroplane: GameModule<AeroplaneState, AeroplaneView> = {
+export const aeroplane: LegacyGameModule<AeroplaneState, AeroplaneView> = {
   kind: "aeroplane",
   name: { zh: "飞行棋", en: "Aeroplane Chess" },
   family: "骰",

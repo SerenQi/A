@@ -8,6 +8,7 @@ export function stubGame(kind: GameKind, zh: string, en: string, family: GameMod
     family,
     blurb,
     ready: false,
+    players: { min: 2, max: 2, default: 2 },
     options: [],
     rules: "Not implemented yet.",
     moveHelp: "",
@@ -15,7 +16,7 @@ export function stubGame(kind: GameKind, zh: string, en: string, family: GameMod
     apply: () => ({ ok: false, error: "这个游戏还没做好" }),
     waitingOn: () => [],
     outcome: () => null,
-    seats: () => ({ human: "", ai: "" }),
+    seatLabels: () => [],
     view: () => ({}),
     describe: () => "Not implemented yet.",
   };

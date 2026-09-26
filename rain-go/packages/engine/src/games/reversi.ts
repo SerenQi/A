@@ -1,11 +1,10 @@
-import type { Actor, GameModule } from "../match/types";
+import type { GameModule, Seat } from "../match/types";
 
-/** Reversi / Othello on 8x8. Black first. A player with no legal move passes automatically. */
+/** Reversi / Othello on 8x8. Seat 0 plays black and moves first. A player with no legal move passes automatically. */
 export interface ReversiState {
   /** 0 empty, 1 black, 2 white. Index = row * 8 + col, row 0 is the top. */
   cells: number[];
   toPlay: 1 | 2;
-  humanColor: 1 | 2;
   moves: number;
   last?: number;
   flipped: number[];
@@ -17,6 +16,8 @@ export interface ReversiState {
 export interface ReversiView extends ReversiState {
   /** Legal points for the side to move, with how many discs each flips. */
   legal: Record<number, number>;
+  /** The viewer's colour, or null for spectators. */
+  you: 1 | 2 | null;
 }
 
 const N = 8;
@@ -59,8 +60,30 @@ export function reversiLegal(cells: number[], color: number): Record<number, num
   return out;
 }
 
-const colorOf = (s: ReversiState, a: Actor): 1 | 2 => (a === "human" ? s.humanColor : s.humanColor === 1 ? 2 : 1);
-const actorOf = (s: ReversiState, c: 1 | 2): Actor => (c === s.humanColor ? "human" : "ai");
+/** Seat 0 is black (1), seat 1 is white (2). */
+const colorOf = (seat: Seat): 1 | 2 => (seat === 0 ? 1 : 2);
+const seatOf = (c: 1 | 2): Seat => c - 1;
+
+/** Classic positional weights: corners are gold, squares next to corners are traps. */
+const WEIGHTS = [
+  120, -20, 20, 5, 5, 20, -20, 120, -20, -40, -5, -5, -5, -5, -40, -20, 20, -5, 15, 3, 3, 15, -5, 20, 5, -5, 3, 3, 3, 3, -5, 5, 5, -5, 3, 3, 3, 3, -5, 5,
+  20, -5, 15, 3, 3, 15, -5, 20, -20, -40, -5, -5, -5, -5, -40, -20, 120, -20, 20, 5, 5, 20, -20, 120,
+];
+
+function reversiBot(s: ReversiState, seat: Seat): string {
+  const legal = reversiLegal(s.cells, colorOf(seat));
+  let best = -1;
+  let bestScore = -Infinity;
+  for (const [k, flips] of Object.entries(legal)) {
+    const p = Number(k);
+    const score = WEIGHTS[p]! + flips * 2 + ((p * 7 + s.moves) % 5) * 0.01;
+    if (score > bestScore) {
+      bestScore = score;
+      best = p;
+    }
+  }
+  return reversiName(best);
+}
 const count = (s: ReversiState, c: number) => s.cells.filter((x) => x === c).length;
 
 export const reversi: GameModule<ReversiState, ReversiView> = {
@@ -69,21 +92,22 @@ export const reversi: GameModule<ReversiState, ReversiView> = {
   family: "棋",
   blurb: "夹住对方就翻面，最后子多者胜。",
   ready: true,
+  players: { min: 2, max: 2, default: 2 },
   options: [],
   rules:
-    'Reversi (Othello) on 8x8. Black moves first. A move must outflank at least one opposing disc in a straight line; all outflanked discs flip. If a player has no legal move they pass automatically; when neither can move the game ends and the player with more discs wins. Moves: "d3" (columns a-h left to right, rows 1-8 top to bottom).',
+    'Reversi (Othello) on 8x8. Seat 0 plays black and moves first. A move must outflank at least one opposing disc in a straight line; all outflanked discs flip. If a player has no legal move they pass automatically; when neither can move the game ends and the player with more discs wins. Moves: "d3" (columns a-h left to right, rows 1-8 top to bottom).',
   moveHelp: '"d3" (columns a-h, rows 1-8 from the top)',
-  create({ humanFirst }) {
+  create() {
     const cells = Array(N * N).fill(0);
     cells[27] = 2;
     cells[28] = 1;
     cells[35] = 1;
     cells[36] = 2;
-    return { cells, toPlay: 1, humanColor: humanFirst ? 1 : 2, moves: 0, flipped: [], over: false };
+    return { cells, toPlay: 1, moves: 0, flipped: [], over: false };
   },
-  apply(s, actor, move) {
+  apply(s, seat, move) {
     if (s.over) return { ok: false, error: "对局已经结束" };
-    const color = colorOf(s, actor);
+    const color = colorOf(seat);
     if (color !== s.toPlay) return { ok: false, error: "还没轮到你" };
     const p = reversiPoint(move);
     if (p === null) return { ok: false, error: `看不懂这步：${move}` };
@@ -105,32 +129,29 @@ export const reversi: GameModule<ReversiState, ReversiView> = {
     return { ok: true, state: { ...s, cells, toPlay, passed, over, last: p, flipped: flips, moves: s.moves + 1 }, log: reversiName(p) };
   },
   waitingOn(s) {
-    return s.over ? [] : [actorOf(s, s.toPlay)];
+    return s.over ? [] : [seatOf(s.toPlay)];
   },
   outcome(s) {
     if (!s.over) return null;
     const b = count(s, 1);
     const w = count(s, 2);
     const text = `黑 ${b} : 白 ${w}`;
-    if (b === w) return { winner: "draw", text };
-    return { winner: actorOf(s, b > w ? 1 : 2), text };
+    if (b === w) return { winners: [], text };
+    return { winners: [seatOf(b > w ? 1 : 2)], text };
   },
-  seats(s) {
-    const h = s.humanColor === 1 ? "黑" : "白";
-    return { human: h, ai: h === "黑" ? "白" : "黑" };
+  seatLabels: () => ["黑", "白"],
+  view(s, viewer) {
+    return { ...s, legal: s.over ? {} : reversiLegal(s.cells, s.toPlay), you: viewer === null ? null : colorOf(viewer) };
   },
-  view(s) {
-    return { ...s, legal: s.over ? {} : reversiLegal(s.cells, s.toPlay) };
-  },
-  describe(s, names) {
-    const ai = colorOf(s, "ai");
+  describe(s, seat, names) {
+    const ai = colorOf(seat);
     const sym = (c: number) => (c === 1 ? "X (black)" : "O (white)");
     const legal = s.over ? {} : reversiLegal(s.cells, s.toPlay);
     const out = [
-      `You are ${sym(ai)}. ${names.human} is ${sym(ai === 1 ? 2 : 1)}. Discs: black ${count(s, 1)}, white ${count(s, 2)}.`,
+      `You are ${sym(ai)}. ${names[1 - seat]} is ${sym(ai === 1 ? 2 : 1)}. Discs: black ${count(s, 1)}, white ${count(s, 2)}.`,
     ];
     if (s.last !== undefined) out.push(`Last move: ${reversiName(s.last)} flipped ${s.flipped.length}.`);
-    if (s.passed) out.push(`${s.passed === ai ? "You" : names.human} had no legal move and passed.`);
+    if (s.passed) out.push(`${s.passed === ai ? "You" : names[1 - seat]} had no legal move and passed.`);
     if (!s.over && s.toPlay === ai) {
       out.push(
         `Your legal moves (discs flipped): ${Object.entries(legal)
@@ -150,4 +171,5 @@ export const reversi: GameModule<ReversiState, ReversiView> = {
     if (!s.over && s.toPlay === ai) out.push("(* marks your legal moves)");
     return out.join("\n");
   },
+  bot: reversiBot,
 };

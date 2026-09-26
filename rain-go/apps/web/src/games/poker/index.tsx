@@ -94,7 +94,7 @@ function Seat({ who, v, name, cards, note }: { who: Actor; v: PokerView; name: s
 function Board({ match, view: v, canAct, send, compact }: BoardProps<PokerView>) {
   const me = v.viewer;
   const them = otherActor(me);
-  const nameOf = (a: Actor) => (a === me ? "你" : a === "human" ? match.humanName : match.aiName);
+  const nameOf = (a: Actor) => (a === me ? "你" : (match.seats[a === "human" ? 0 : 1]?.name ?? ""));
   const recap = inRecap(v);
   const lh = v.lastHand;
   const [picking, setPicking] = useState(false);

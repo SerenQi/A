@@ -1,4 +1,4 @@
-import type { Actor, GameKind, MatchAction, MatchView } from "@rain-go/engine";
+import type { GameKind, MatchAction, MatchView, PublicSeat, Seat, SeatKind } from "@rain-go/engine";
 
 const TOKEN_KEY = "rain-go:token";
 const BG_KEY = "rain-go:bg";
@@ -47,6 +47,9 @@ export const prefs = {
     write(NAMES_KEY, JSON.stringify(list));
   },
   forgetName: (name: string) => write(NAMES_KEY, JSON.stringify(prefs.recentNames().filter((n) => n !== name))),
+  /** The seat token this device holds for a game. */
+  seatToken: (id: string) => read(`rain-go:seat:${id}`),
+  setSeatToken: (id: string, token: string) => write(`rain-go:seat:${id}`, token),
   lastNames: () => readJson<{ human: string; ai: string }>(LAST_NAMES_KEY, { human: "", ai: "" }),
   setLastNames: (human: string, ai: string) => write(LAST_NAMES_KEY, JSON.stringify({ human: human.trim(), ai: ai.trim() })),
 };
@@ -61,10 +64,11 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function request<T>(path: string, init: RequestInit = {}, seatToken?: string): Promise<T> {
   const headers = new Headers(init.headers);
   const token = prefs.token();
   if (token) headers.set("authorization", `Bearer ${token}`);
+  if (seatToken) headers.set("x-seat", seatToken);
   if (init.body) headers.set("content-type", "application/json");
   const res = await fetch(path, { ...init, headers });
   const body = (await res.json().catch(() => ({}))) as Record<string, unknown>;
@@ -75,24 +79,38 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 export interface GameMeta {
   id: string;
   kind: GameKind;
-  humanName: string;
-  aiName: string;
-  seats: Record<Actor, string>;
+  seats: PublicSeat[];
+  labels: string[];
   over: boolean;
-  waitingOn: Actor[];
+  waitingOn: Seat[];
   moves: number;
   result?: string;
   createdAt: number;
   updatedAt: number;
 }
 
+export interface SeatSpec {
+  kind: SeatKind;
+  name?: string;
+  me?: boolean;
+}
+
+export interface Invite {
+  seat: Seat;
+  kind: SeatKind;
+  name: string;
+  joined: boolean;
+  link: string | null;
+}
+
 export const api = {
   config: () => request<{ authRequired: boolean }>("/api/config"),
   checkAuth: () => request<{ ok: true }>("/api/auth"),
   listGames: () => request<{ games: GameMeta[] }>("/api/games").then((r) => r.games),
-  createGame: (o: { kind: GameKind; options: Record<string, string>; humanFirst: boolean; humanName?: string; aiName?: string }) =>
-    request<{ match: MatchView }>("/api/games", { method: "POST", body: JSON.stringify(o) }).then((r) => r.match),
-  getGame: (id: string) => request<{ match: MatchView }>(`/api/games/${id}`).then((r) => r.match),
-  act: (id: string, action: MatchAction) =>
-    request<{ match: MatchView }>(`/api/games/${id}/actions`, { method: "POST", body: JSON.stringify(action) }).then((r) => r.match),
+  createGame: (o: { kind: GameKind; options: Record<string, string>; seats: SeatSpec[] }) =>
+    request<{ match: MatchView; token: string | null; invites: Invite[] }>("/api/games", { method: "POST", body: JSON.stringify(o) }),
+  getGame: (id: string, seatToken?: string) => request<{ match: MatchView }>(`/api/games/${id}`, {}, seatToken).then((r) => r.match),
+  invites: (id: string) => request<{ invites: Invite[]; tokens: (string | null)[] }>(`/api/games/${id}/invites`),
+  act: (id: string, seatToken: string, action: MatchAction) =>
+    request<{ match: MatchView }>(`/api/games/${id}/actions`, { method: "POST", body: JSON.stringify(action) }, seatToken).then((r) => r.match),
 };

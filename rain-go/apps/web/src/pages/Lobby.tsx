@@ -1,7 +1,7 @@
-import { GAMES, cleanOptions, readyGames, type GameKind } from "@rain-go/engine";
+import { GAMES, cleanOptions, defaultSeatKinds, readyGames, type GameKind, type SeatKind } from "@rain-go/engine";
 import { motion } from "motion/react";
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, prefs, type GameMeta } from "../api";
+import { api, ApiError, prefs, type GameMeta, type SeatSpec } from "../api";
 import { BRAND } from "../brand";
 import { IconSwap } from "../components/icons";
 import { Pill, Ring } from "../components/Pill";
@@ -31,8 +31,14 @@ const SYMBOL = new Set<GameKind>(["chess", "poker", "monopoly", "aeroplane"]);
 
 function statusOf(g: GameMeta) {
   if (g.over) return g.result ?? "已结束";
-  return g.waitingOn.includes("human") ? "轮到你" : `等 ${g.aiName}`;
+  const mine = prefs.seatToken(g.id);
+  const waiting = g.waitingOn.map((i) => g.seats[i]?.name).filter(Boolean);
+  return mine && g.waitingOn.some((i) => g.seats[i]?.kind === "human") ? `等 ${waiting.join("、")}` : `等 ${waiting.join("、") || "…"}`;
 }
+
+type SeatChoice = "me" | SeatKind;
+const CHOICE_ZH: Record<SeatChoice, string> = { me: "你", human: "朋友", ai: "AI", bot: "机器人" };
+const defaultSeats = (k: GameKind): SeatChoice[] => defaultSeatKinds(k).map((s, i) => (i === 0 ? "me" : s));
 
 function readKind(): GameKind {
   try {
@@ -52,7 +58,7 @@ export function Lobby() {
   const [syncedAt, setSyncedAt] = useState<number | null>(null);
   const [kind, setKindRaw] = useState<GameKind>(readKind);
   const [options, setOptions] = useState<Record<string, string>>(() => cleanOptions(readKind()));
-  const [humanFirst, setHumanFirst] = useState(true);
+  const [seats, setSeats] = useState<SeatChoice[]>(() => defaultSeats(readKind()));
   const [humanName, setHumanName] = useState(() => prefs.lastNames().human);
   const [aiName, setAiName] = useState(() => prefs.lastNames().ai);
   const [busy, setBusy] = useState(false);
@@ -61,6 +67,7 @@ export function Lobby() {
   const setKind = (k: GameKind) => {
     setKindRaw(k);
     setOptions(cleanOptions(k));
+    setSeats(defaultSeats(k));
     try {
       localStorage.setItem(KIND_KEY, k);
     } catch {
@@ -89,13 +96,32 @@ export function Lobby() {
     };
   }, [load]);
 
+  /** Tapping a seat cycles 你 → 朋友 → AI → 机器人; only one seat can be 你. */
+  const cycleSeat = (i: number) => {
+    const order: SeatChoice[] = ["me", "human", "ai", ...(mod.bot ? (["bot"] as const) : [])];
+    const next = order[(order.indexOf(seats[i]!) + 1) % order.length]!;
+    setSeats(seats.map((s, j) => (j === i ? next : next === "me" && s === "me" ? "human" : s)));
+  };
+  const resize = (d: number) => {
+    const n = Math.min(mod.players.max, Math.max(mod.players.min, seats.length + d));
+    setSeats(n > seats.length ? [...seats, ...Array<SeatChoice>(n - seats.length).fill(mod.bot ? "bot" : "ai")] : seats.slice(0, n));
+  };
+
   const create = async () => {
     setBusy(true);
     try {
-      const m = await api.createGame({ kind, options, humanFirst, humanName: humanName.trim() || undefined, aiName: aiName.trim() || undefined });
+      const firstAi = seats.indexOf("ai");
+      const specs: SeatSpec[] = seats.map((s, i) => ({
+        kind: s === "me" ? "human" : s,
+        me: s === "me",
+        name: s === "me" ? humanName.trim() || undefined : i === firstAi ? aiName.trim() || undefined : undefined,
+      }));
+      const res = await api.createGame({ kind, options, seats: specs });
+      if (res.token) prefs.setSeatToken(res.match.id, res.token);
       prefs.rememberNames(humanName, aiName);
       prefs.setLastNames(humanName, aiName);
-      navigate(`/g/${m.id}`);
+      const invite = seats.some((s) => s === "human") || res.invites.filter((v) => v.kind === "ai").length > 1;
+      navigate(`/g/${res.match.id}${invite ? "?invite" : ""}`);
     } catch (e) {
       toast.show(e instanceof ApiError && e.status === 401 ? "需要访问口令" : "开局失败");
     } finally {
@@ -157,20 +183,39 @@ export function Lobby() {
           <div className="mt-2.5 space-y-2 lg:mt-4 lg:space-y-3">
             <div className="flex gap-2">
               {mod.options.slice(0, 1).map((o) => (
-                <div key={o.key} className="seg flex-1" role="group" aria-label={o.label}>
+                <div key={o.key} className="seg shrink-0" role="group" aria-label={o.label}>
                   {o.choices.map((c) => (
-                    <button key={c.value} className={seg} aria-pressed={options[o.key] === c.value} onClick={() => setOptions({ ...options, [o.key]: c.value })}>
+                    <button key={c.value} className={`${seg} whitespace-nowrap !px-2.5`} aria-pressed={options[o.key] === c.value} onClick={() => setOptions({ ...options, [o.key]: c.value })}>
                       {c.label}
                     </button>
                   ))}
                 </div>
               ))}
-              <div className="seg flex-1" role="group" aria-label="先手">
-                <button className={seg} aria-pressed={humanFirst} onClick={() => setHumanFirst(true)}>
-                  我先
-                </button>
-                <button className={seg} aria-pressed={!humanFirst} onClick={() => setHumanFirst(false)}>
-                  AI 先
+              <div className="seg min-w-0 flex-1 gap-1 overflow-x-auto" role="group" aria-label="座位，按行动顺序">
+                {seats.map((s, i) => (
+                  <button
+                    key={i}
+                    className={`${seg} shrink-0 whitespace-nowrap !px-2.5`}
+                    aria-pressed={s === "me"}
+                    onClick={() => cycleSeat(i)}
+                    title={`座位 ${i + 1}`}
+                  >
+                    {i === 0 && <span className="mr-0.5 text-[0.7rem] opacity-60">先</span>}
+                    {CHOICE_ZH[s]}
+                  </button>
+                ))}
+                {seats.length < mod.players.max && (
+                  <button className={`${seg} shrink-0 !px-2.5`} aria-label="加一个座位" onClick={() => resize(1)}>
+                    ＋
+                  </button>
+                )}
+                {seats.length > mod.players.min && (
+                  <button className={`${seg} shrink-0 !px-2.5`} aria-label="减一个座位" onClick={() => resize(-1)}>
+                    －
+                  </button>
+                )}
+                <button className={`${seg} shrink-0 !px-2.5`} aria-label="换先手" onClick={() => setSeats([...seats.slice(1), seats[0]!])}>
+                  ↻
                 </button>
               </div>
             </div>
@@ -223,13 +268,14 @@ export function Lobby() {
 }
 
 function GameRow({ g }: { g: GameMeta }) {
-  const mine = !g.over && g.waitingOn.includes("human");
+  const token = prefs.seatToken(g.id);
+  const mine = !g.over && Boolean(token) && g.waitingOn.some((i) => g.seats[i]?.kind === "human");
   const mod = GAMES[g.kind];
   return (
     <button onClick={() => navigate(`/g/${g.id}`)} className="flex w-full items-center justify-between gap-3 rounded-2xl px-1 py-1.5 text-left transition hover:bg-white/30">
       <div className="stat-bar min-w-0">
         <div className="truncate text-[1.05rem] lg:text-[1.2rem]">
-          {mod?.name.zh ?? g.kind} · {g.humanName} × {g.aiName}
+          {mod?.name.zh ?? g.kind} · {g.seats.map((s) => s.name).join(" × ")}
         </div>
         <div className="text-sm text-faint">
           {new Date(g.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })} · {hhmm(g.updatedAt)}

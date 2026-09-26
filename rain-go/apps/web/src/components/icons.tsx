@@ -76,3 +76,9 @@ export const IconFlag = (p: SVGProps<SVGSVGElement>) => (
     <path d="M5 21V4M5 4h11l-2 4 2 4H5" />
   </svg>
 );
+export const IconInvite = (p: SVGProps<SVGSVGElement>) => (
+  <svg {...base(p)}>
+    <circle cx="9" cy="8.5" r="3.2" />
+    <path d="M3.5 19a5.5 5.5 0 0 1 11 0M18 8v6M15 11h6" />
+  </svg>
+);

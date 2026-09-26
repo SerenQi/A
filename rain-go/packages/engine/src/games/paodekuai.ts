@@ -1,5 +1,5 @@
 import { shuffled } from "../match/rng";
-import { otherActor, type Actor, type GameModule } from "../match/types";
+import { otherActor, type Actor, type LegacyGameModule } from "../match/types";
 import {
   PDK_RANKS,
   PDK_TYPE_EN,
@@ -120,7 +120,7 @@ const RULES = [
   'Moves: "pass" (also 不要 / 过), or the cards to play separated by spaces. By rank only ("3 3", "10 J Q K A", "T J Q K A" with T for 10; the exact cards are picked from your hand) or with suits ("S3 H3" or "♠3 ♥3"; suits S H C D).',
 ].join("\n");
 
-export const paodekuai: GameModule<PaodekuaiState, PaodekuaiView> = {
+export const paodekuai: LegacyGameModule<PaodekuaiState, PaodekuaiView> = {
   kind: "paodekuai",
   name: { zh: "跑得快", en: "Run Fast" },
   family: "牌",

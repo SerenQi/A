@@ -1,5 +1,5 @@
 import { shuffled } from "../match/rng";
-import { otherActor, type Actor, type GameModule } from "../match/types";
+import { otherActor, type Actor, type LegacyGameModule } from "../match/types";
 import { POKER_DECK, pokerBestHand, pokerCompare, pokerHandNameEn, pokerHandNameZh } from "./poker-hand";
 
 export * from "./poker-hand";
@@ -380,7 +380,7 @@ function actionText(e: PokerActionEntry, who: string, you: boolean): string {
   }
 }
 
-export const poker: GameModule<PokerState, PokerView> = {
+export const poker: LegacyGameModule<PokerState, PokerView> = {
   kind: "poker",
   name: { zh: "德州扑克", en: "Hold'em" },
   family: "牌",

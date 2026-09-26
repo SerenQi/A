@@ -1,15 +1,14 @@
 import { DurableObject } from "cloudflare:workers";
-import type { Actor, GameKind } from "@rain-go/engine";
+import type { GameKind, PublicSeat, Seat } from "@rain-go/engine";
 import type { Env } from "./env";
 
 export interface GameMeta {
   id: string;
   kind: GameKind;
-  humanName: string;
-  aiName: string;
-  seats: Record<Actor, string>;
+  seats: PublicSeat[];
+  labels: string[];
   over: boolean;
-  waitingOn: Actor[];
+  waitingOn: Seat[];
   moves: number;
   result?: string;
   createdAt: number;
@@ -25,7 +24,7 @@ export class Lobby extends DurableObject<Env> {
   async list(limit = 50, includeFinished = true): Promise<GameMeta[]> {
     const all = await this.ctx.storage.list<GameMeta>({ prefix: "g:" });
     return [...all.values()]
-      .filter((g) => g.kind && (includeFinished || !g.over))
+      .filter((g) => Array.isArray(g.seats) && (includeFinished || !g.over))
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .slice(0, limit);
   }

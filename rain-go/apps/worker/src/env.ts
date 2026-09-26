@@ -1,4 +1,4 @@
-import type { Actor, Match, MatchAction, NewMatchOptions } from "@rain-go/engine";
+import type { Match, MatchAction, NewMatchOptions, Seat } from "@rain-go/engine";
 import type { ActResult, GameRoom } from "./game-room";
 import type { Lobby } from "./lobby";
 
@@ -20,8 +20,9 @@ export function roomOf(env: Env, id: string) {
   return {
     create: (o: NewMatchOptions) => stub.create(o) as unknown as Promise<Match>,
     get: () => stub.get() as unknown as Promise<Match | null>,
-    act: (actor: Actor, action: MatchAction) => stub.act(actor, action) as unknown as Promise<ActResult>,
-    waitFor: (actor: Actor, ms: number) => stub.waitFor(actor, ms) as unknown as Promise<{ match: Match | null; timedOut: boolean }>,
+    act: (seat: Seat, action: MatchAction) => stub.act(seat, action) as unknown as Promise<ActResult>,
+    join: (seat: Seat) => stub.join(seat) as unknown as Promise<Match | null>,
+    waitFor: (seat: Seat, ms: number) => stub.waitFor(seat, ms) as unknown as Promise<{ match: Match | null; timedOut: boolean }>,
     fetch: (req: Request) => stub.fetch(req),
   };
 }
@@ -33,6 +34,16 @@ export function newGameId(): string {
 }
 
 export const isGameId = (s: string) => /^[a-z0-9]{6,32}$/.test(s);
+
+/** Seat tokens start with the game id so a token alone finds its game: "<gameId>-<secret>". */
+export function newSeatToken(gameId: string): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16));
+  return `${gameId}-${[...bytes].map((b) => b.toString(16).padStart(2, "0")).join("")}`;
+}
+export function gameOfToken(token: string | null | undefined): string | null {
+  const m = token ? /^([a-z0-9]{6,32})-[0-9a-f]{32}$/.exec(token) : null;
+  return m ? m[1]! : null;
+}
 
 function safeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;

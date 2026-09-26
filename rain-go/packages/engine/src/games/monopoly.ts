@@ -1,5 +1,5 @@
 import { randomInt, shuffled } from "../match/rng";
-import { otherActor, type Actor, type GameModule } from "../match/types";
+import { otherActor, type Actor, type LegacyGameModule } from "../match/types";
 import {
   MONOPOLY_BOARD_SIZE,
   MONOPOLY_CARDS,
@@ -499,7 +499,7 @@ const RULES = [
   "Moves: roll, buy, skip, build <space name or index> (e.g. build 夜雨 or build 7), pay (pay 50 to leave jail), card (use a get-out card), end.",
 ].join("\n");
 
-export const monopoly: GameModule<MonopolyState, MonopolyView> = {
+export const monopoly: LegacyGameModule<MonopolyState, MonopolyView> = {
   kind: "monopoly",
   name: { zh: "大富翁", en: "Monopoly" },
   family: "骰",

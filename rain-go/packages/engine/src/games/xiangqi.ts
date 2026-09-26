@@ -1,4 +1,4 @@
-import type { Actor, GameModule } from "../match/types";
+import type { Actor, LegacyGameModule } from "../match/types";
 import {
   XIANGQI_FILES,
   XIANGQI_START_FEN,
@@ -105,7 +105,7 @@ export function xiangqiBoardText(board: XiangqiBoard): string {
 const LEGEND =
   "Legend: uppercase = Red, lowercase = Black. K/k general 帥/將, A/a advisor 仕/士, B/b elephant 相/象, N/n horse 馬, R/r chariot 車, C/c cannon 炮/砲, P/p soldier 兵/卒. Files a-i left to right from Red's side, ranks 0 (Red's back rank) to 9 (Black's back rank); Red's palace is d0-f2, Black's d7-f9.";
 
-export const xiangqi: GameModule<XiangqiState, XiangqiView> = {
+export const xiangqi: LegacyGameModule<XiangqiState, XiangqiView> = {
   kind: "xiangqi",
   name: { zh: "中国象棋", en: "Xiangqi" },
   family: "棋",
