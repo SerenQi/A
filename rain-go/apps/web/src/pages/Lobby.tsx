@@ -25,6 +25,9 @@ export const GLYPH: Record<GameKind, string> = {
   aeroplane: "✈",
 };
 
+/** Symbol glyphs render smaller than CJK characters at the same size. */
+const SYMBOL = new Set<GameKind>(["chess", "poker", "monopoly", "aeroplane"]);
+
 function statusOf(g: GameMeta) {
   if (g.over) return g.result ?? "已结束";
   return g.waitingOn.includes("human") ? "轮到你" : `等 ${g.aiName}`;
@@ -145,7 +148,7 @@ export function Lobby() {
                   kind === g.kind ? "border-transparent bg-ink text-white" : "border-white/80 bg-white/35 text-ink"
                 }`}
               >
-                <span className="text-[1.2rem] leading-none lg:text-[1.6rem]">{GLYPH[g.kind]}</span>
+                <span className={`leading-none ${SYMBOL.has(g.kind) ? "text-[1.55rem] lg:text-[2rem]" : "text-[1.2rem] lg:text-[1.6rem]"}`}>{GLYPH[g.kind]}</span>
                 <span className="mt-1 whitespace-nowrap text-[0.7rem] leading-none lg:text-sm">{g.name.zh}</span>
               </button>
             ))}

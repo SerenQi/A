@@ -60,6 +60,7 @@ pnpm install
 echo 'ACCESS_TOKEN=devtoken' > apps/worker/.dev.vars
 pnpm dev                              # 构建前端并在 http://127.0.0.1:8787 启动 Worker
 pnpm --filter @rain-go/worker smoke  # 另开终端：端到端跑一遍 MCP 对局流程
+pnpm --filter @rain-go/worker all-games  # 9 种游戏各开一局走几步，并检查牌局不泄露 AI 的手牌
 pnpm --filter @rain-go/worker seed   # 造一局有长棋块和提子的演示棋
 pnpm --filter @rain-go/worker ai-pass <id> [move]  # 让 AI 走一步，默认停一手
 pnpm test                             # 规则引擎单元测试
