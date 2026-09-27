@@ -1,5 +1,5 @@
 import { COLUMNS, EMPTY, other, starPoints, step, type Chain, type Color, type GameState } from "@rain-go/engine";
-import { DropDefs } from "../../components/drops";
+import { ArmedHint, DropDefs } from "../../components/drops";
 import { useMemo, useRef, useState, type PointerEvent, type ReactElement } from "react";
 
 const BEAD_R = 0.41;
@@ -105,6 +105,8 @@ function DropLayer({ layer, size, newest }: { layer: Layer; size: number; newest
           {shapes}
         </g>
       </g>
+      {/* Plain copy under the goo layer: the drop stays solid even where a browser renders the filter soft. */}
+      <g fill={black ? "url(#ink)" : "url(#milk)"}>{shapes}</g>
       <g filter="url(#goo)" fill={black ? "url(#ink)" : "url(#milk)"}>
         {shapes}
       </g>
@@ -299,16 +301,7 @@ export function Board(p: BoardProps) {
             opacity={armed !== null ? 0.72 : 0.38}
           />
           {armed !== null && (
-            <circle
-              cx={armed % size}
-              cy={Math.floor(armed / size)}
-              r={BEAD_R + 0.12}
-              fill="none"
-              stroke="#0b0b0b"
-              strokeWidth={0.035}
-              strokeDasharray="0.12 0.1"
-              opacity={0.7}
-            />
+            <ArmedHint x={armed % size} y={Math.floor(armed / size)} r={BEAD_R} fs={Math.max(0.3, size * 0.03)} lo={-PAD + 0.3} hi={size - 1 + PAD - 0.3} />
           )}
         </g>
       )}

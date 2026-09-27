@@ -1,5 +1,5 @@
 import { COLUMNS, toGtp, type GomokuView } from "@rain-go/engine";
-import { Bead, DropDefs, LastMark } from "../../components/drops";
+import { Bead, DropDefs, LastMark, ArmedHint } from "../../components/drops";
 import { usePlacement } from "../../hooks/usePlacement";
 import type { BoardProps, GameUI } from "../types";
 
@@ -85,6 +85,7 @@ function Board({ view: s, canAct, send, toast }: BoardProps<GomokuView>) {
       {place.preview !== null && !s.cells[place.preview] && (
         <Bead x={place.preview % n} y={Math.floor(place.preview / n)} dark={humanDark} opacity={place.armed !== null ? 0.72 : 0.38} />
       )}
+      {place.armed !== null && <ArmedHint x={place.armed % n} y={Math.floor(place.armed / n)} fs={Math.max(0.3, n * 0.03)} lo={-PAD + 0.3} hi={n - 1 + PAD - 0.3} />}
     </svg>
   );
 }

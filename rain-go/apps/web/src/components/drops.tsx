@@ -10,7 +10,7 @@ export function DropDefs() {
         <feGaussianBlur stdDeviation="0.09" />
         <feColorMatrix values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -9" />
       </filter>
-      <filter id="drop-shadow" x="-5%" y="-5%" width="110%" height="115%">
+      <filter id="drop-shadow" x="-40%" y="-40%" width="180%" height="190%">
         <feDropShadow dx="0.04" dy="0.09" stdDeviation="0.07" floodOpacity="0.28" />
       </filter>
       <radialGradient id="ink" cx="35%" cy="30%" r="80%">
@@ -84,6 +84,31 @@ export function LastMark({ x, y, r = 0.51, dark, k }: { x: number; y: number; r?
     <g pointerEvents="none">
       <circle cx={x} cy={y} r={r} fill="none" stroke={stroke} strokeWidth={0.03} opacity={0.5} />
       <circle key={k} className="ripple" cx={x} cy={y} r={r} fill="none" stroke={stroke} strokeWidth={0.03} />
+    </g>
+  );
+}
+
+/**
+ * Marks a stone that a touch has armed but not yet placed: a dashed ring and a small ink tag,
+ * so the see-through preview never reads as a placed stone. `fs` is the tag's font size and
+ * `lo`/`hi` the board's drawable extent, used to keep the tag on the board.
+ */
+export function ArmedHint({ x, y, r = 0.41, fs, lo, hi }: { x: number; y: number; r?: number; fs: number; lo: number; hi: number }) {
+  const text = "再点一下落子";
+  const w = fs * (text.length + 1.1);
+  const h = fs * 1.6;
+  const cx = Math.min(hi - w / 2, Math.max(lo + w / 2, x));
+  const above = y - r - 0.12 - h >= lo;
+  const top = above ? y - r - 0.12 - h : y + r + 0.12;
+  return (
+    <g pointerEvents="none">
+      <circle cx={x} cy={y} r={r + 0.12} fill="none" stroke="#0b0b0b" strokeWidth={0.035} strokeDasharray="0.12 0.1" opacity={0.7} />
+      <g className="drop-in" style={{ transformBox: "fill-box", transformOrigin: "center" }}>
+        <rect x={cx - w / 2} y={top} width={w} height={h} rx={h / 2} fill="rgb(11 11 11 / 0.86)" />
+        <text x={cx} y={top + h / 2} fontSize={fs} fill="#fff" textAnchor="middle" dominantBaseline="central" fontFamily="var(--font-serif)">
+          {text}
+        </text>
+      </g>
     </g>
   );
 }

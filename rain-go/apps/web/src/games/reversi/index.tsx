@@ -1,5 +1,5 @@
 import { reversiName, type ReversiView } from "@rain-go/engine";
-import { Bead, DropDefs, LastMark } from "../../components/drops";
+import { Bead, DropDefs, LastMark, ArmedHint } from "../../components/drops";
 import { usePlacement } from "../../hooks/usePlacement";
 import type { BoardProps, GameUI } from "../types";
 
@@ -69,6 +69,7 @@ function Board({ view: s, canAct, send, toast }: BoardProps<ReversiView>) {
       {place.preview !== null && s.legal[place.preview] && (
         <Bead x={(place.preview % N) + 0.5} y={Math.floor(place.preview / N) + 0.5} r={0.4} dark={mine === 1} opacity={place.armed !== null ? 0.72 : 0.38} />
       )}
+      {place.armed !== null && <ArmedHint x={(place.armed % N) + 0.5} y={Math.floor(place.armed / N) + 0.5} r={0.4} fs={0.3} lo={-0.25} hi={8.75} />}
     </svg>
   );
 }
