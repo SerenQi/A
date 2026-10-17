@@ -8,6 +8,6 @@ const serveUrl = await bundle({entryPoint: path.resolve('src/index.ts')});
 const browserExecutable = process.env.REMOTION_BROWSER ?? null;
 const composition = await selectComposition({serveUrl, id: 'Theseus', browserExecutable});
 for (const frame of frames) {
-  await renderStill({composition, serveUrl, frame, output: `out/f${frame}.png`, browserExecutable, imageFormat: 'jpeg', jpegQuality: 80});
+  await renderStill({composition, serveUrl, frame, output: `out/f${frame}.jpg`, browserExecutable, imageFormat: 'jpeg', jpegQuality: 80});
   console.log('rendered', frame);
 }

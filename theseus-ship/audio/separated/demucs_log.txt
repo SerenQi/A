@@ -1,0 +1,32 @@
+tool: demucs (npm) 1.0.0 — htdemucs v4 4-stem ONNX port, weights bundled in package; onnxruntime-node CPU; overlap 0.25
+input: 44.1kHz stereo PCM transcoded from audio/source/*.mp3 (originals untouched)
+=== A_hell_source_mix start 18:59:46
+Loading model...
+Reading and processing audio...
+Writing output files...
+  Wrote: separated/A_hell_source_mix/drums.wav
+  Wrote: separated/A_hell_source_mix/bass.wav
+  Wrote: separated/A_hell_source_mix/other.wav
+  Wrote: separated/A_hell_source_mix/vocals.wav
+Done!
+=== A_hell_source_mix exit=0 elapsed=126s
+=== B_entropy_source_mix start 19:01:52
+Loading model...
+Reading and processing audio...
+Writing output files...
+  Wrote: separated/B_entropy_source_mix/drums.wav
+  Wrote: separated/B_entropy_source_mix/bass.wav
+  Wrote: separated/B_entropy_source_mix/other.wav
+  Wrote: separated/B_entropy_source_mix/vocals.wav
+Done!
+=== B_entropy_source_mix exit=0 elapsed=129s
+=== C_nihilism_source_mix start 19:04:01
+Loading model...
+Reading and processing audio...
+Writing output files...
+  Wrote: separated/C_nihilism_source_mix/drums.wav
+  Wrote: separated/C_nihilism_source_mix/bass.wav
+  Wrote: separated/C_nihilism_source_mix/other.wav
+  Wrote: separated/C_nihilism_source_mix/vocals.wav
+Done!
+=== C_nihilism_source_mix exit=0 elapsed=129s

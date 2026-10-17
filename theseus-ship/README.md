@@ -1,19 +1,6 @@
-# 特修斯之船 · The Ship of Theseus
+# 忒修斯之船 · The Ship of Theseus
 
-一部用 [Remotion](https://www.remotion.dev/) 制作的哲学科普短片：1920×1080、30fps、约 3 分 10 秒，无配音，全程中文字幕。
-
-## 分镜
-
-| # | 场景 | 内容 |
-|---|------|------|
-| 1 | 片头 | 金色粒子汇聚，线稿描出古希腊三十桨船，书法标题砸入 |
-| 2 | 传说 | 克里特迷宫生长 → 剑光斩开米诺陶洛斯 → 日出凯旋 → 雅典港口的纪念 |
-| 3 | 替换 | 船坞特写：63 块错缝木板逐块朽坏、拆下飞向旧木堆，新木板拖着金光落位；计数器归零 |
-| 4 | 提问 | 巨大问号与冲击波，"这，还是特修斯之船吗？"，普鲁塔克的卷轴 |
-| 5 | 霍布斯 | 旧木板从四面飞回、重组成第二艘船，A / B 两船对峙 |
-| 6 | 四种回答 | 物质决定论 / 时空连续论 / 赫拉克利特 / 约定论，3D 翻转卡片 |
-| 7 | 你自己 | 粒子人体不断更新，细胞数据卡；镜头推进大脑，神经网络重新连线 |
-| 8 | 尾声 | 夕阳中船驶向地平线，"是什么，让你成为你？"，片尾标题 |
+Remotion 知识动画：1920×1080、30fps、165 秒（4950 帧），中文字幕，细线美术。
 
 ## 运行
 
@@ -21,19 +8,29 @@
 npm install
 npm run dev        # Remotion Studio 预览
 npm run render     # 输出 out/theseus-ship.mp4
+node stills.mjs 600 720 810   # 渲染指定帧到 out/f<帧>.jpg（调试用）
 ```
 
-若想使用本机已有的 Chromium 而不是让 Remotion 下载浏览器，可设置
-`REMOTION_BROWSER=/path/to/chrome-headless-shell`。
-
-`node stills.mjs <帧号...>` 可一次渲染多张调试截图到 `out/`。
+想用本机已有的 Chromium，设置 `REMOTION_BROWSER=/path/to/chrome-headless-shell`。
 
 ## 结构
 
-- `src/script.ts` — 场景时长、全部字幕与卡片文案（改文案只需改这里）
-- `src/lib/ship.ts` — 船体几何：上翘的船首尾曲线与错缝木板
-- `src/lib/replace.ts` — 每块木板的朽坏 / 拆除 / 换新时间表
-- `src/components/` — 船、海、天空、光束、冲击波、火花、字幕等通用组件
-- `src/scenes/` — 八个场景
+| 文件 | 内容 |
+|---|---|
+| `src/config.ts` | **全部制作参数**：fps、时长、11 个场景边界、配色、线宽、字体、字幕、画面文字、音乐路径 / 取段起点 / 音量包络 |
+| `src/lib/hull.ts` | 船体几何：舷缘、龙骨、船首尾柱；22 块列板（5 列、错缝），每块有稳定 id、局部坐标、外法向、“拉直”形态 |
+| `src/lib/story.ts` | 由帧号推导的全部状态：拆换时间表、旧板 / 新板轨迹、旧料区槽位、重组顺序、单一镜头关键帧 |
+| `src/components/ShipParts.tsx` | 船体结构线、木板、缺口 |
+| `src/components/Human.tsx` | 人体轮廓（儿童→成人拓扑一致，可逐点变形与粒子对位） |
+| `src/components/Overlay.tsx` | 字幕、背景、尘点、标签、时间刻度 |
+| `src/components/Music.tsx` | 顶层音频挂载 |
+| `src/Film.tsx` | 把所有图层挂在同一个镜头 group 下 |
+| `audio/` | 参考原混音、分离记录，见 `audio/README.md` |
+| `reference/` | 参考截图（右侧平台按钮是遮挡，不是作品） |
+| `docs/` | 制作命令原文、检查结果 |
 
-字体：思源宋体（Noto Serif SC）与马善政书法体，来自 `@fontsource`，渲染前会按片中出现的全部汉字预加载。
+## 原则
+
+- 一切状态由 `frame / fps` 推导，任意跳帧结果一致；随机数用固定种子。
+- 一块木板从拆下、进旧料区、到组成 B 船，用的是同一个 id 与同一条轨迹。
+- 镜头只有一个父级 group；线宽按镜头缩放补偿，屏幕上保持 1.8 / 0.8 / 0.6 px。

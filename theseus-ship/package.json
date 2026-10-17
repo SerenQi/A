@@ -10,11 +10,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@fontsource/ma-shan-zheng": "^5.3.1",
+    "@fontsource/noto-sans-sc": "^5.3.1",
     "@fontsource/noto-serif-sc": "^5.3.1",
     "@remotion/cli": "^4.0.536",
     "@remotion/noise": "^4.0.536",
-    "@remotion/transitions": "^4.0.536",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "remotion": "^4.0.536"

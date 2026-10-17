@@ -1,3 +1,8 @@
 node_modules
 out
 .DS_Store
+# 大体积音频中间文件（可由 audio/README.md 中的步骤重建）
+audio/work/
+audio/separated/**/*.wav
+audio/listen/
+public/audio/*.wav
