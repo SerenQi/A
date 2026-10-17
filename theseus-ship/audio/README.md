@@ -42,5 +42,7 @@
 
 ## 接入
 
+**已选定 A**（用户选择）。成片使用 `public/audio/bgm_A_hell_no_vocals.wav`，`startFrom = 0`，电平 0.65：A 轨原始整合响度 −12.2 LUFS，成片实测 −16.0 LUFS、峰值 −6.6 dBFS。
+
 `src/config.ts` 里的 `MUSIC.track` 设为 `'A' | 'B' | 'C'` 后，`src/components/Music.tsx` 在顶层挂载对应文件：
 `startFrom` 秒起取段，0–1.2 s 淡入，161–165 s 淡出，电平 `MUSIC.level`。目前没有新旁白，所以没有做旁白闪避（ducking）。

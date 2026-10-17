@@ -97,15 +97,19 @@ export const ONSCREEN = {
  * startFrom: 从原音轨第几秒开始取段（保持原速、原音高）。
  */
 export const MUSIC = {
-  track: null as null | 'A' | 'B' | 'C',
+  // 用户选定：A《他人即地狱》（htdemucs 分离后的 no_vocals，模型几乎未检出人声）
+  track: 'A' as null | 'A' | 'B' | 'C',
   files: {
     A: 'audio/bgm_A_hell_no_vocals.wav',
     B: 'audio/bgm_B_entropy_no_vocals.wav',
     C: 'audio/bgm_C_nihilism_no_vocals.wav',
   },
   startFrom: 0,
-  /** 伴奏电平（线性）。目前无旁白，只是全程统一电平。 */
-  level: 0.85,
+  /**
+   * 伴奏电平（线性）。A 轨原始整合响度 −12.2 LUFS；0.65 ≈ −3.7 dB，目标约 −16 LUFS。
+   * 目前没有新旁白，所以全程统一电平、不做闪避。
+   */
+  level: 0.65,
   fadeIn: [0, 1.2] as const,
   fadeOut: [161, 165] as const,
 };
