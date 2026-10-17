@@ -1,7 +1,7 @@
 import React from 'react';
 import {FONTS, PALETTE as P} from '../config';
 import {clamp01, easeOut, lerp, span, win} from '../lib/anim';
-import {Badge, Battery, Hand, NotebookBox, NotifCard, Pen, Phone, ScreenText, ScrollList, Sheet, Stamp, Strike, Ticket, Clip, handWidth} from '../components/Kit';
+import {Badge, Battery, Hand, NotebookBox, NotifCard, Pen, Phone, ScreenText, ScrollList, Sheet, Strike, handWidth} from '../components/Kit';
 
 export type SceneProps = {t: number};
 
@@ -118,39 +118,6 @@ export const P02: React.FC<SceneProps> = ({t}) => {
       {[0, 1].map((i) => (
         <circle key={i} cx={830 + i * 260} cy={109} r={3} fill={P.text} opacity={Math.min(props[i], props[i + 1]) * 0.5} />
       ))}
-    </g>
-  );
-};
-
-/* ============ P03 存在的证据（27–38s）============ */
-export const P03: React.FC<SceneProps> = ({t}) => {
-  const enter = span(t, 0, 1.2, easeOut);
-  const tear = span(t, 1.4, 2.6);
-  const away = span(t, 2.4, 4.4);
-  const center = span(t, 3.6, 5.4);
-  const sheetIn = span(t, 3.4, 5.2, easeOut);
-  return (
-    <g>
-      <Sheet x={lerp(1500, 1040, sheetIn)} y={540} w={560} h={700} rot={lerp(10, -3, sheetIn)} seed={4} level={sheetIn}>
-        <Hand id="p03a" x={84} y={58} text="三月十四日 晴" size={40} opacity={0.85} />
-      </Sheet>
-      <Ticket
-        x={lerp(1500, 900, enter)}
-        y={lerp(500, 480, center)}
-        rot={lerp(8, -2, enter)}
-        scale={lerp(1, 1.1, center)}
-        bodyDx={-tear * 30 - away * 520}
-        bodyDy={away * 80}
-        bodyRot={-away * 14}
-        bodyOpacity={1 - span(t, 3.4, 4.6)}
-        stubDx={tear * 24 + center * 120}
-        stubRot={tear * 6 - center * 4}
-        perforation={tear < 0.05}
-      />
-      {/* 印章与回形针落在票根上 */}
-      <Stamp x={1110} y={520} t={t - 6.2} />
-      {t > 7.4 && <Clip x={1086} y={402 + lerp(-30, 0, span(t, 7.4, 8.0))} rot={4} />}
-      <Pen x={420} y={860} rot={18} len={400} />
     </g>
   );
 };
