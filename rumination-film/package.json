@@ -1,11 +1,11 @@
 {
-  "name": "porcupine-film",
+  "name": "rumination-film",
   "version": "1.0.0",
   "private": true,
   "description": "薛定谔的猫 — Remotion 短片 (1920x1080, 30fps)",
   "scripts": {
     "dev": "remotion studio",
-    "render": "remotion render Porcupine out/porcupine.mp4",
+    "render": "remotion render Rumination out/rumination.mp4",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

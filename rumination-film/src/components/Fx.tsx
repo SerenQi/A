@@ -1,6 +1,6 @@
 import React from 'react';
 import {AbsoluteFill} from 'remotion';
-import {CUES, FONTS, H, IMPACTS, ONSCREEN, PALETTE as P, SLAMS, SUBTITLE, W} from '../config';
+import {CUES, FONTS, H, IMPACTS, ONSCREEN, PALETTE as P, SLAMS, SUBTITLE, W, WORDS} from '../config';
 import {clamp01, easeOut, hash, lerp, span, win} from '../lib/anim';
 
 /* ---------------- 冲击：震屏与白闪 ---------------- */
@@ -97,7 +97,7 @@ export const Slams: React.FC<{s: number}> = ({s}) => {
     fontFamily: FONTS.title,
     fontWeight: 900,
     fontSize: sl.size,
-    letterSpacing: sl.kind === 'title' ? 8 : 6,
+    letterSpacing: sl.kind === 'title' ? 36 : 6,
     whiteSpace: 'nowrap',
   };
   return (
@@ -105,14 +105,14 @@ export const Slams: React.FC<{s: number}> = ({s}) => {
       {split > 0.3 && (
         <>
           <div style={{...style, color: P.red, transform: `translate(${-split}px,0)`, mixBlendMode: 'screen', opacity: 0.85}}>{chars.join('')}</div>
-          <div style={{...style, color: P.quantum, transform: `translate(${split}px,0)`, mixBlendMode: 'screen', opacity: 0.85}}>{chars.join('')}</div>
+          <div style={{...style, color: P.cold, transform: `translate(${split}px,0)`, mixBlendMode: 'screen', opacity: 0.85}}>{chars.join('')}</div>
         </>
       )}
       {sl.kind === 'title' && (
-        <div style={{...style, top: y - sl.size * 0.62 - 90, fontSize: 34, fontWeight: 600, letterSpacing: 20, color: P.gold}}>{ONSCREEN.kicker}</div>
+        <div style={{...style, top: y + sl.size * 0.62, fontSize: 38, fontWeight: 600, letterSpacing: 10, color: P.gold}}>{ONSCREEN.kicker}</div>
       )}
       <div style={{...style, color: P.text, textShadow: '0 0 40px rgba(255,244,222,0.35), 0 6px 20px rgba(0,0,0,0.8)'}}>{chars.join('')}</div>
-      {sl.kind === 'glitch' &&
+      {(sl.kind as string) === 'glitch' &&
         [0, 1, 2].map((k) => {
           const on = hash(Math.floor(t * 12) + k * 7) > 0.55;
           if (!on) return null;
@@ -213,7 +213,7 @@ export const Subtitles: React.FC<{s: number}> = ({s}) => {
 
 /* ---------------- 角标：问题与出处 ---------------- */
 export const Corners: React.FC<{s: number}> = ({s}) => {
-  const q = win(s, 5.4, 162, 0.8, 0.8);
+  const q = win(s, 17.6, 145, 0.8, 0.8);
   const src = ONSCREEN.sources.find((x) => s >= x.from && s < x.to);
   return (
     <>
@@ -224,5 +224,36 @@ export const Corners: React.FC<{s: number}> = ({s}) => {
         </div>
       )}
     </>
+  );
+};
+
+/* ---------------- 画面中央的大字（淡入、轻微放大，不震动） ---------------- */
+export const BigWords: React.FC<{s: number}> = ({s}) => {
+  const w = WORDS.find((x) => s >= x.from && s < x.to);
+  if (!w) return null;
+  const t = s - w.from;
+  const e = easeOut(clamp01(t / 0.6));
+  const o = e * (1 - span(s, w.to - 0.4, w.to));
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: 0,
+        width: W,
+        top: H / 2 - 90,
+        textAlign: 'center',
+        fontFamily: FONTS.title,
+        fontWeight: 900,
+        fontSize: 130,
+        letterSpacing: 10,
+        color: w.color,
+        opacity: o,
+        transform: `scale(${lerp(1.08, 1, e) + t * 0.008})`,
+        filter: e < 0.98 ? `blur(${(1 - e) * 10}px)` : undefined,
+        textShadow: `0 0 40px ${w.color}66, 0 0 12px ${w.color}88`,
+      }}
+    >
+      {w.text}
+    </div>
   );
 };

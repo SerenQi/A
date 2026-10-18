@@ -4,5 +4,5 @@ import {Film} from './Film';
 import {DURATION, FPS, H, W} from './config';
 
 export const RemotionRoot: React.FC = () => (
-  <Composition id="Porcupine" component={Film} durationInFrames={DURATION} fps={FPS} width={W} height={H} />
+  <Composition id="Rumination" component={Film} durationInFrames={DURATION} fps={FPS} width={W} height={H} />
 );
