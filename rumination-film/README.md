@@ -28,7 +28,11 @@ node stills.mjs 600 1200   # 渲染指定帧到 out/f<帧>.jpg
 | 文件 | 内容 |
 |---|---|
 | `src/config.ts` | 时长、8 个场景、配色、字幕、画面大字、出处、音乐参数 |
-| `src/components/Dots.tsx` | 把路径取样成光点的点阵图形（头像、人、牛、相框） |
+| `src/lib/points.ts` | 点云：路径/文字取样、挤出成 3D、旋转投影、加色发光绘制 |
+| `src/lib/clouds.ts` | 片中点云：人头、牛、人、标题字 |
+| `src/lib/room.ts` | 透视卧室：墙、窗、光柱、浮尘、床 |
+| `src/components/Canvas.tsx` | 每帧重画的整屏 canvas |
+| `src/scenes/draw.ts` | 场景共用画法：光斑、水流、地面网格、发光线、流动的粒子环 |
 | `src/components/Kit.tsx` | 舞台、镜头、轨道光点、气泡、文字 |
 | `src/components/Fx.tsx` | 字幕、画面大字、角标、颗粒、震动 |
 | `src/scenes/ScenesA.tsx` | 开头四种内耗、粒子标题、牛的反刍、绕着答案转 |
