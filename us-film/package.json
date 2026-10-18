@@ -1,0 +1,31 @@
+{
+  "name": "us-film",
+  "version": "1.0.0",
+  "private": true,
+  "description": "薛定谔的猫 — Remotion 短片 (1920x1080, 30fps)",
+  "scripts": {
+    "dev": "remotion studio",
+    "render": "remotion render Us out/us.mp4",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fontsource/noto-sans-sc": "^5.3.1",
+    "@fontsource/noto-serif-sc": "^5.3.1",
+    "@react-three/drei": "10.0.7",
+    "@react-three/fiber": "9.1.2",
+    "@react-three/postprocessing": "3.0.4",
+    "@remotion/cli": "^4.0.536",
+    "@remotion/three": "4.0.536",
+    "postprocessing": "6.37.2",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "remotion": "^4.0.536",
+    "three": "0.170.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@types/three": "^0.170.0",
+    "typescript": "^5.6.3"
+  }
+}
