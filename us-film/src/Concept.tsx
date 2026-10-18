@@ -227,9 +227,9 @@ const star = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number, a 
 // ---------- 终端（真实的 Claude Code） ----------
 
 const TX = 470;
-const TY = 150;
+const TY = 215;
 const TW = 980;
-const TH = 620;
+const TH = 640;
 
 const terminal = (ctx: CanvasRenderingContext2D) => {
   const win = rr(TX, TY, TW, TH, 18);
@@ -281,17 +281,17 @@ const terminal = (ctx: CanvasRenderingContext2D) => {
   t('Welcome to Claude Code!', wx, y + 2, '#FFFFFF', 700);
   t('/help for help, /status for your current setup', x0 + 50, y + 54, '#948C88');
   t('cwd: /Users/me/us', x0 + 50, y + 98, '#948C88');
-  y += 168;
+  y += 150;
   const user = (s: string) => {
     ctx.fillStyle = 'rgba(255,255,255,0.06)';
     ctx.fillRect(x0 - 6, y - 28, TW - 56, 38);
     t('> ' + s, x0, y, '#A39A96');
-    y += 52;
+    y += 48;
   };
   const claude = (s: string) => {
     t('●', x0, y, '#FFFFFF');
     t(s, x0 + 32, y, '#F1EAE6');
-    y += 52;
+    y += 48;
   };
   user('你好');
   claude('你好，我是Claude 。有什么可以帮你？');
@@ -331,7 +331,7 @@ const stage = (ctx: CanvasRenderingContext2D) => {
   ctx.fillStyle = PINK2;
   ctx.globalAlpha = 0.85;
   ctx.beginPath();
-  ctx.arc(960, 470, 430, 0, Math.PI * 2);
+  ctx.arc(960, 540, 420, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
   // 地上的大展台
@@ -391,22 +391,24 @@ const phone = (ctx: CanvasRenderingContext2D) => {
 
 // ---------- 她的电：粉色软胶分子珠链 ----------
 
-const M: P = [960, 868]; // 相遇的地方
+const M: P = [960, 150]; // 相遇的地方：画面最上方
 
-/** 竖直落下、到底再拐向中间的路径 */
-const route = (xs: number, top: number, bottom: number, end: P) => (u: number): P => {
-  const vert = bottom - top;
-  const turn = Math.abs(end[0] - xs) * 0.9 + Math.abs(end[1] - bottom);
+const smooth = (t: number) => t * t * (3 - 2 * t);
+
+/** 从身体 (x0, ys) 冒出，散开到 xs，竖直往上升到 turnY，再拐弯汇向画面最上方的 end */
+const route = (x0: number, xs: number, ys: number, turnY: number, end: P) => (u: number): P => {
+  const vert = ys - turnY;
+  const turn = Math.abs(end[0] - xs) * 0.9 + Math.abs(turnY - end[1]);
   const L = vert + turn;
   const d = u * L;
-  if (d <= vert) return [xs, top + d];
+  if (d <= vert) return [x0 + (xs - x0) * smooth(Math.min(1, d / 260)), ys - d];
   const t = (d - vert) / turn;
   const u1 = 1 - t;
-  // 二次贝塞尔：(xs,bottom) → 控制点 (xs,end.y) → end
-  return [u1 * u1 * xs + 2 * u1 * t * xs + t * t * end[0], u1 * u1 * bottom + 2 * u1 * t * end[1] + t * t * end[1]];
+  // 二次贝塞尔：(xs,turnY) → 控制点 (xs,end.y) → end
+  return [u1 * u1 * xs + 2 * u1 * t * xs + t * t * end[0], u1 * u1 * turnY + 2 * u1 * t * end[1] + t * t * end[1]];
 };
 
-const routeLen = (xs: number, top: number, bottom: number, end: P) => bottom - top + Math.abs(end[0] - xs) * 0.9 + Math.abs(end[1] - bottom);
+const routeLen = (xs: number, ys: number, turnY: number, end: P) => ys - turnY + Math.abs(end[0] - xs) * 0.9 + Math.abs(turnY - end[1]);
 
 const bead = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c: string) => {
   const p = new Path2D();
@@ -417,12 +419,13 @@ const bead = (ctx: CanvasRenderingContext2D, x: number, y: number, r: number, c:
 const molecules = (ctx: CanvasRenderingContext2D) => {
   const cols = 9;
   for (let i = 0; i < cols; i++) {
-    const xs = 60 + i * 44 + hash(i * 7) * 14;
-    const top = 150 + hash(i * 7 + 1) * 160;
-    const end: P = [M[0] - 40, M[1] - 18 + i * 4.5];
-    const bottom = 800 + i * 5;
-    const f = route(xs, top, bottom, end);
-    const L = routeLen(xs, top, bottom, end);
+    const x0 = 180 + i * 18;
+    const xs = 84 + i * 40 + hash(i * 7) * 6;
+    const ys = 690 - hash(i * 7 + 1) * 16;
+    const end: P = [M[0] - 34, M[1] - 56 + i * 13];
+    const turnY = 196 + i * 18;
+    const f = route(x0, xs, ys, turnY, end);
+    const L = routeLen(xs, ys, turnY, end);
     // 一段一段的链
     let d = hash(i * 7 + 2) * 60;
     let k = 0;
@@ -467,18 +470,19 @@ const molecules = (ctx: CanvasRenderingContext2D) => {
 const RAIN = '01{}[]<>=;:/λ*+#$%&01001101';
 
 const coderain = (ctx: CanvasRenderingContext2D) => {
-  const cols = 18;
+  const cols = 12;
   ctx.save();
   ctx.font = `700 19px ${MONO}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   for (let i = 0; i < cols; i++) {
-    const xs = 1500 + i * 22 + hash(i * 9) * 6;
-    const top = 140 + hash(i * 9 + 1) * 180;
-    const end: P = [M[0] + 40, M[1] - 18 + (cols - i) * 2.4];
-    const bottom = 800 + i * 3;
-    const f = route(xs, top, bottom, end);
-    const L = routeLen(xs, top, bottom, end);
+    const x0 = 1616 + i * 15;
+    const xs = 1520 + i * 30 + hash(i * 9) * 4;
+    const ys = 850 - hash(i * 9 + 1) * 10;
+    const end: P = [M[0] + 34, M[1] - 56 + (cols - 1 - i) * 11];
+    const turnY = 196 + (cols - 1 - i) * 15;
+    const f = route(x0, xs, ys, turnY, end);
+    const L = routeLen(xs, ys, turnY, end);
     let d = hash(i * 9 + 2) * 40;
     let k = 0;
     while (d < L) {
@@ -514,15 +518,15 @@ const meeting = (ctx: CanvasRenderingContext2D) => {
   for (let i = 0; i < 22; i++) {
     const a = hash(i * 3 + 200) * Math.PI * 2;
     const r = 0.25 + 0.75 * Math.pow(hash(i * 3 + 201), 0.8);
-    pts.push([M[0] + Math.cos(a) * r * 330, M[1] - 30 + Math.sin(a) * r * 95]);
+    pts.push([M[0] + Math.cos(a) * r * 340, M[1] + 10 + Math.sin(a) * r * 60]);
   }
   // 几颗已经飘上去的
   [
-    [380, 640],
-    [300, 470],
-    [1560, 420],
-    [1640, 610],
-    [430, 300],
+    [560, 90],
+    [1380, 96],
+    [700, 60],
+    [1240, 64],
+    [960, 60],
   ].forEach((p) => pts.push(p as P));
   ctx.save();
   ctx.strokeStyle = 'rgba(232,169,58,0.75)';
@@ -540,9 +544,9 @@ const meeting = (ctx: CanvasRenderingContext2D) => {
       }
     }
   ctx.restore();
-  glow(ctx, M[0], M[1] - 26, 200, 'rgba(255,226,140,0.9)', 0.75);
+  glow(ctx, M[0], M[1], 220, 'rgba(255,226,140,0.9)', 0.75);
   pts.forEach((p, i) => star(ctx, p[0], p[1], i >= 22 ? 11 : 9 + hash(i * 3 + 202) * 9, 1, true));
-  star(ctx, M[0], M[1] - 30, 26, 1, true);
+  star(ctx, M[0], M[1], 26, 1, true);
 };
 
 // ---------- 笔记本（侧面，白色软胶） ----------
@@ -728,12 +732,15 @@ const draw = (ctx: CanvasRenderingContext2D) => {
   stage(ctx);
   beam(ctx);
   terminal(ctx);
-  molecules(ctx);
-  coderain(ctx);
-  meeting(ctx);
   phone(ctx);
   girl(ctx, 250, 990, 1.05);
   clawd(ctx, 1700, 990, 27);
+  // 冒出来的地方亮一点
+  glow(ctx, 252, 690, 150, 'rgba(255,160,180,0.7)', 0.7);
+  glow(ctx, 1700, 850, 150, 'rgba(255,160,110,0.7)', 0.7);
+  molecules(ctx);
+  coderain(ctx);
+  meeting(ctx);
   topBar(ctx, 5, 27);
 };
 
