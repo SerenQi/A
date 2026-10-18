@@ -131,7 +131,7 @@ export const drawPoints = (
   ctx: CanvasRenderingContext2D,
   pts: P3[],
   cam: Cam3,
-  opts: {color: string; size?: number; alpha?: number; twinkle?: number; t?: number; alphaOf?: (i: number) => number; colorOf?: (i: number) => string | null},
+  opts: {color: string; size?: number; alpha?: number; twinkle?: number; t?: number; alphaOf?: (i: number) => number; colorOf?: (i: number) => string | null; shade?: boolean},
 ) => {
   const size = opts.size ?? 6;
   const base = opts.alpha ?? 1;
@@ -146,7 +146,18 @@ export const drawPoints = (
     const q = project(pts[i], cam);
     if (q.k <= 0) continue;
     const s = size * q.k;
-    const a = base * a0 * (1 - tw + tw * Math.sin(i * 1.7 + t * 3)) * Math.min(1.4, q.k);
+    let lit = 1;
+    if (opts.shade) {
+      // 以物体中心为原点近似法线，光从左上前方打来
+      const sc = cam.scale ?? 1;
+      const nx = (q.x - cam.cx) / (q.k * sc);
+      const ny = (q.y - cam.cy) / (q.k * sc);
+      const nz = q.z;
+      const len = Math.hypot(nx, ny, nz) || 1;
+      const d = (-0.55 * nx - 0.5 * ny - 0.67 * nz) / len;
+      lit = 0.18 + 0.95 * Math.max(0, Math.min(1, 0.5 + 0.6 * d));
+    }
+    const a = base * a0 * lit * (1 - tw + tw * Math.sin(i * 1.7 + t * 3)) * Math.min(1.4, q.k);
     ctx.globalAlpha = Math.max(0, Math.min(1, a));
     const c = opts.colorOf ? opts.colorOf(i) : null;
     ctx.drawImage(c ? glowSprite(c) : spr, q.x - s, q.y - s, s * 2, s * 2);

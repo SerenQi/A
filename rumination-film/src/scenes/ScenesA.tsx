@@ -7,6 +7,8 @@ import {SHAPES} from '../components/Dots';
 import {COW, N, centroidOf, cowCloud, headCloud, personCloud, textCloud} from '../lib/clouds';
 import {Cam3, P3, drawPoints, lerp3, scatter} from '../lib/points';
 import {bedPoint, drawRoom} from '../lib/room';
+import {paintCanvas, halftone} from '../lib/halftone';
+import {paintHead, paintRoom} from '../lib/paint';
 import {bg, bokeh, dust, flowRing, glowDot, mixColor, streaks} from './draw';
 
 const Svg: React.FC<{children: React.ReactNode}> = ({children}) => (
@@ -67,9 +69,19 @@ export const R1: React.FC<SP> = ({s}) => {
       ctx.translate(W / 2, H / 2);
       ctx.scale(z, z);
       ctx.translate(-W / 2 - 80, -H / 2 + 30);
-      drawRoom(ctx, t, 0);
-      const {hx, hy} = lyingPerson(ctx, t, a);
-      flowRing(ctx, t, {yaw: 0, pitch: 0.35, cx: hx, cy: hy - 150, scale: 1}, {R: 110, r: 8, n: 800, speed: 1.4, color: P.ember, size: 4.5, alpha: a});
+      ctx.restore();
+      const pc = paintCanvas();
+      pc.translate(W / 2, H / 2);
+      pc.scale(z, z);
+      pc.translate(-W / 2 - 80, -H / 2 + 30);
+      const {hx, hy} = paintRoom(pc, t, 0);
+      halftone(ctx, {cell: 8, alpha: a, t, gamma: 1.3, min: 0.06});
+      ctx.save();
+      ctx.translate(W / 2, H / 2);
+      ctx.scale(z, z);
+      ctx.translate(-W / 2 - 80, -H / 2 + 30);
+      dust(ctx, t, 120, P.gold, 0.4 * a);
+      flowRing(ctx, t, {yaw: 0, pitch: 0.35, cx: hx, cy: hy - 110, scale: 1}, {R: 110, r: 8, n: 800, speed: 1.4, color: P.red, size: 4.5, alpha: a});
       ctx.restore();
     }
     if (b > 0) {
@@ -82,9 +94,23 @@ export const R1: React.FC<SP> = ({s}) => {
     if (c > 0) {
       ctx.save();
       ctx.globalAlpha = c;
-      streaks(ctx, t, 340);
       const flinch = t > 7.4 ? Math.exp(-(t - 7.4) * 5) * Math.sin((t - 7.4) * 50) * 14 : 0;
-      drawPoints(ctx, headCloud(), {yaw: -0.25, pitch: 0, cx: 640 + flinch, cy: 600, scale: 0.85}, {color: P.ice, size: 4, alpha: 0.7 * c, t});
+      const pc = paintCanvas();
+      paintHead(pc, 640 + flinch, 1020, 1.7, 0.9, 1);
+      pc.save();
+      pc.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 90; i++) {
+        const x = hash(i) * W;
+        const y = ((t * (900 + hash(i + 1) * 600) + hash(i + 2) * (H + 400)) % (H + 400)) - 300;
+        pc.strokeStyle = `rgba(255,255,255,${0.25 + hash(i + 4) * 0.3})`;
+        pc.lineWidth = 6;
+        pc.beginPath();
+        pc.moveTo(x, y);
+        pc.lineTo(x - 8, y + 120);
+        pc.stroke();
+      }
+      pc.restore();
+      halftone(ctx, {cell: 8, alpha: c, t});
       // 碎片一样飞进来的旧画面
       for (let i = 0; i < 14; i++) {
         const k = clamp01((t - 7.2 - i * 0.04) / 0.6);
@@ -106,7 +132,7 @@ export const R1: React.FC<SP> = ({s}) => {
         ctx.closePath();
         const g = ctx.createLinearGradient(-r, -r, r, r);
         g.addColorStop(0, `rgba(233,227,214,${0.5 * c})`);
-        g.addColorStop(1, i % 4 === 0 ? `rgba(229,72,60,${0.6 * c})` : `rgba(120,130,150,${0.35 * c})`);
+        g.addColorStop(1, i % 4 === 0 ? `rgba(229,72,60,${0.6 * c})` : `rgba(232,194,122,${0.3 * c})`);
         ctx.fillStyle = g;
         ctx.fill();
         ctx.strokeStyle = `rgba(255,255,255,${0.6 * c})`;
@@ -122,7 +148,7 @@ export const R1: React.FC<SP> = ({s}) => {
       dust(ctx, t, 200, P.gold, 0.5);
       const yaw = -0.5 + (t - 9.5) * 0.2;
       const cam: Cam3 = {yaw, pitch: 0.08, cx: W / 2, cy: 560, scale: 1.05};
-      drawPoints(ctx, headCloud(), cam, {color: P.gold, size: 4.2, alpha: 0.55 * d, t});
+      drawPoints(ctx, headCloud(), cam, {color: P.gold, size: 4.4, alpha: 0.8 * d, t, shade: true});
       const speed = 1 + span(t, 9.7, 12.8) * 3;
       for (let k = 0; k < 4; k++) {
         flowRing(ctx, t * speed + k, cam, {
@@ -188,7 +214,7 @@ export const R2: React.FC<SP> = ({s}) => {
       const p = lerp3(mid, text[i], g);
       pts[i] = lerp3(p, {x: sp.x * 1.4, y: sp.y * 1.4 - 200, z: sp.z}, o);
     }
-    drawPoints(ctx, pts, {yaw, pitch: 0.02, cx: W / 2, cy: 500, scale: 1}, {color: P.ember, size: lerp(4.2, 3.6, gather), alpha: 0.85, t, twinkle: 0.25});
+    drawPoints(ctx, pts, {yaw, pitch: 0.02, cx: W / 2, cy: 500, scale: 1}, {color: P.ember, size: lerp(4.2, 3.6, gather), alpha: 0.85, t, twinkle: 0.25, shade: gather < 0.5});
   };
   return (
     <>
@@ -221,7 +247,7 @@ export const R3: React.FC<SP> = ({s}) => {
       ctx.save();
       ctx.globalAlpha = 1 - morph;
       const ground: P3[] = Array.from({length: 1400}, (_, i) => ({x: (hash(i * 1.3) - 0.5) * 2600, y: 150 + hash(i * 2.2) * 6, z: (hash(i * 3.1) - 0.5) * 1600}));
-      drawPoints(ctx, ground, cowCam, {color: '#8FE3B0', size: 3, alpha: 0.35, t});
+      drawPoints(ctx, ground, cowCam, {color: '#9A8458', size: 3, alpha: 0.35, t});
       ctx.restore();
     }
     const pts: P3[] = new Array(N);
@@ -235,7 +261,7 @@ export const R3: React.FC<SP> = ({s}) => {
       pts[i] = {x: p.x + lift * 0.4, y: p.y - Math.abs(lift) * 0.3, z: p.z + lift};
     }
     const col = morph > 0.5 ? P.gold : P.gold;
-    drawPoints(ctx, pts, cam, {color: col, size: 4.2, alpha: 0.7, t});
+    drawPoints(ctx, pts, cam, {color: col, size: 4.4, alpha: 0.95, t, shade: true});
     // 草团：嘴 → 胃 → 嘴，一圈一圈
     if (morph < 1) {
       const mouth = {x: 395 * 2 - cc.x, y: -135 * 2 - cc.y};
@@ -250,7 +276,7 @@ export const R3: React.FC<SP> = ({s}) => {
       });
       ctx.save();
       ctx.globalAlpha = span(t, 18.4, 19.0) * (1 - morph);
-      drawPoints(ctx, cud, cowCam, {color: '#8FE3B0', size: 7, alpha: 1, t, twinkle: 0.1});
+      drawPoints(ctx, cud, cowCam, {color: P.ember, size: 7, alpha: 1, t, twinkle: 0.1});
       ctx.restore();
     }
     // 人脑里的圈

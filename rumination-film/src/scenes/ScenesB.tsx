@@ -6,7 +6,9 @@ import {Canvas} from '../components/Canvas';
 import {personCloud, slumpCloud} from '../lib/clouds';
 import {Cam3, P3, drawPoints, glowSprite, lerp3, sphere} from '../lib/points';
 import {drawRoom, windowCenter} from '../lib/room';
-import {bg, dust, floorGrid, flowRing, glowDot, glowLine, mixColor} from './draw';
+import {bg, dotFloor, dust, flowRing, glowDot, glowLine, mixColor} from './draw';
+import {paintCanvas, halftone} from '../lib/halftone';
+import {paintRoom} from '../lib/paint';
 import {lyingPerson} from './ScenesA';
 
 const Svg: React.FC<{children: React.ReactNode}> = ({children}) => (
@@ -43,7 +45,7 @@ export const R5: React.FC<SP> = ({s}) => {
   const solve = span(s, 65.6, 66.6);
   const draw = (ctx: CanvasRenderingContext2D, t: number) => {
     bg(ctx, '#05060A', '#0D0B08');
-    floorGrid(ctx, HORIZON, 0.14 * people);
+    dotFloor(ctx, HORIZON + 40, 0.55 * people);
     dust(ctx, t, 140, P.gold, 0.35);
     // 中线
     ctx.save();
@@ -59,7 +61,7 @@ export const R5: React.FC<SP> = ({s}) => {
     const sl = slumpCloud(500);
     [L, R].forEach((gx, gi) => {
       const slump = gi === 0 ? 0.5 + 0.5 * leftDown : 0.5 - 0.5 * rightUp;
-      const col = gi === 0 ? mixColor('#9A9CA4', P.cold, q(leftDown)) : mixColor('#9A9CA4', P.gold, q(rightUp));
+      const col = gi === 0 ? mixColor('#A89E8C', '#B5524A', q(leftDown)) : mixColor('#A89E8C', '#F2C27A', q(rightUp));
       for (let row = 0; row < 2; row++) {
         for (let k = 0; k < 4; k++) {
           const idx = row * 4 + k;
@@ -68,7 +70,7 @@ export const R5: React.FC<SP> = ({s}) => {
           const y = row === 0 ? 600 : 720;
           const pts = pc.map((p, i) => lerp3(p, sl[i], slump));
           const appear = span(t, 42.0 + idx * 0.08, 43.2 + idx * 0.08);
-          drawPoints(ctx, pts, {yaw: -0.3 + hash(idx + gi * 9) * 0.6, pitch: 0, cx: x, cy: y - 130 * sc, scale: sc}, {color: col, size: 3.6, alpha: 0.75 * appear * (1 - 0.5 * solve), t: t + idx});
+          drawPoints(ctx, pts, {yaw: -0.3 + hash(idx + gi * 9) * 0.6, pitch: 0, cx: x, cy: y - 130 * sc, scale: sc}, {color: col, size: 3.8, alpha: 0.9 * appear * (1 - 0.5 * solve), t: t + idx, shade: true});
         }
       }
     });
@@ -79,7 +81,7 @@ export const R5: React.FC<SP> = ({s}) => {
       const cloud: P3[] = sphere(1400, 260, 41).map((p) => ({x: p.x * 1.6, y: p.y * 0.35, z: p.z * 0.6}));
       ctx.save();
       ctx.globalAlpha = a * span(t, 50, 57);
-      drawPoints(ctx, cloud, {yaw: t * 0.05, pitch: 0, cx: L, cy: 200, scale: 1}, {color: '#6C7080', size: 6, alpha: 0.45, t});
+      drawPoints(ctx, cloud, {yaw: t * 0.05, pitch: 0, cx: L, cy: 200, scale: 1}, {color: '#7A6A5A', size: 6, alpha: 0.45, t});
       ctx.restore();
     }
     // 右：想些不相干的画面——漂浮的小星团
@@ -89,7 +91,7 @@ export const R5: React.FC<SP> = ({s}) => {
         const cx = R - 330 + hash(c) * 660 + Math.sin(t * 0.4 + c) * 30;
         const cy = 230 + hash(c + 3) * 170 + Math.cos(t * 0.5 + c) * 16;
         const blob = sphere(140, 30 + hash(c + 5) * 26, 50 + c);
-        drawPoints(ctx, blob, {yaw: t * 0.6 + c, pitch: 0.4, cx, cy, scale: 1}, {color: [P.green, P.ice, P.ember][c % 3], size: 4, alpha: 0.8 * a, t});
+        drawPoints(ctx, blob, {yaw: t * 0.6 + c, pitch: 0.4, cx, cy, scale: 1}, {color: [P.gold, P.paper, P.ember][c % 3], size: 4, alpha: 0.8 * a, t});
       }
     }
     // 心情曲线
@@ -102,8 +104,8 @@ export const R5: React.FC<SP> = ({s}) => {
       glowLine(ctx, pts, col, 5, 1 - solve);
       if (pts.length) glowDot(ctx, pts[pts.length - 1][0], pts[pts.length - 1][1], 30, col, 1 - solve);
     };
-    if (leftDown > 0) curve(L, -1, leftDown, P.cold);
-    if (rightUp > 0) curve(R, 1, rightUp, P.green);
+    if (leftDown > 0) curve(L, -1, leftDown, P.red);
+    if (rightUp > 0) curve(R, 1, rightUp, P.ember);
     // 解决难题：办法的质量
     if (solve > 0) {
       [L, R].forEach((gx, gi) => {
@@ -116,7 +118,7 @@ export const R5: React.FC<SP> = ({s}) => {
           ctx.fillStyle = 'rgba(255,255,255,0.05)';
           ctx.fillRect(gx - 320, y, 640, 34);
           ctx.restore();
-          glowLine(ctx, [[gx - 320, y + 17], [gx - 320 + 640 * full * grow, y + 17]], gi === 0 ? P.cold : P.gold, 20, solve * 0.9);
+          glowLine(ctx, [[gx - 320, y + 17], [gx - 320 + 640 * full * grow, y + 17]], gi === 0 ? '#B5524A' : P.gold, 20, solve * 0.9);
         }
       });
     }
@@ -131,7 +133,7 @@ export const R5: React.FC<SP> = ({s}) => {
           <Txt x={W / 2} y={184} text={timer} size={36} color={P.text} weight={600} />
         </g>
         <Txt x={L} y={130} text="想自己" size={46} color={P.red} font={FONTS.title} weight={900} spacing={10} o={leftThink * (1 - solve)} glow />
-        <Txt x={R} y={130} text="想别的" size={46} color={P.green} font={FONTS.title} weight={900} spacing={10} o={rightThink * (1 - solve)} glow />
+        <Txt x={R} y={130} text="想别的" size={46} color={P.ember} font={FONTS.title} weight={900} spacing={10} o={rightThink * (1 - solve)} glow />
         <Txt x={L - 320} y={232} text="办法" size={26} color={P.dim} anchor="start" o={solve} />
         <Txt x={R - 320} y={232} text="办法" size={26} color={P.dim} anchor="start" o={solve} />
       </Svg>
@@ -245,7 +247,7 @@ export const R7: React.FC<SP> = ({s}) => {
     if (top > 0) {
       if (split < 1) flowRing(ctx, t, {yaw: 0, pitch: 0.2, cx: W / 2, cy: 470, scale: 1}, {R: 260, r: 20, n: 2400, speed: 1.2, color: P.red, size: 4.5, alpha: 0.8 * (1 - split) * top});
       if (split > 0) {
-        const sprC = glowSprite(P.cold);
+        const sprC = glowSprite('#B5524A');
         const sprG = glowSprite(P.gold);
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
@@ -282,18 +284,18 @@ export const R7: React.FC<SP> = ({s}) => {
         const a = span(t, 118.3, 118.8) * top;
         for (let i = 0; i < 18; i++) {
           const b = t * 3.5 - i * 0.08;
-          glowDot(ctx, LX + Math.cos(b) * 150, 820 + Math.sin(b) * 34, 22 * (1 - i / 18), P.green, a * (1 - i / 18));
+          glowDot(ctx, LX + Math.cos(b) * 150, 820 + Math.sin(b) * 34, 22 * (1 - i / 18), P.ember, a * (1 - i / 18));
         }
         const sw = clamp01((t - 121.7) / 1.6);
         if (t > 121.7) {
-          glowDot(ctx, lerp(RX0 + 160, RX0 + 720, easeOut(sw)), 820, 26 * (1 - sw), P.green, a);
-          if (sw > 0.6) glowDot(ctx, RX0 + 720, 820, 40 + sw * 160, P.green, a * (1 - sw) * 1.6);
-        } else glowDot(ctx, RX0 + 160, 820, 26, P.green, a);
+          glowDot(ctx, lerp(RX0 + 160, RX0 + 720, easeOut(sw)), 820, 26 * (1 - sw), P.ember, a);
+          if (sw > 0.6) glowDot(ctx, RX0 + 720, 820, 40 + sw * 160, P.ember, a * (1 - sw) * 1.6);
+        } else glowDot(ctx, RX0 + 160, 820, 26, P.ember, a);
       }
     }
     // 起身，走一圈
     if (walk > 0) {
-      floorGrid(ctx, 360, 0.12 * walk);
+      dotFloor(ctx, 420, 0.5 * walk);
       const tt = Math.max(0, t - 125.4);
       const stand = span(t, 124.8, 126.2);
       const x = 560 + tt * 130;
@@ -301,7 +303,7 @@ export const R7: React.FC<SP> = ({s}) => {
       const pc = personCloud(900);
       const sl = slumpCloud(900);
       const pts = pc.map((p, i) => lerp3(sl[i], p, stand));
-      drawPoints(ctx, pts, {yaw: 0.5, pitch: 0, cx: x, cy: 760 - 160 - bob, scale: 1.25}, {color: P.gold, size: 4, alpha: 0.85 * walk, t});
+      drawPoints(ctx, pts, {yaw: 0.5, pitch: 0, cx: x, cy: 760 - 160 - bob, scale: 1.25}, {color: P.gold, size: 4.2, alpha: 0.95 * walk, t, shade: true});
       const ring = 1 - span(t, 127.4, 131.0);
       for (let i = 0; i < 140; i++) {
         const a = (i / 140) * Math.PI * 2 + t * 2;
@@ -319,7 +321,7 @@ export const R7: React.FC<SP> = ({s}) => {
       <Canvas s={s} draw={draw} />
       <Svg>
         <g opacity={split * (1 - compare) * (1 - walk)}>
-          <Txt x={LX} y={200} text="为什么" size={52} color={P.cold} font={FONTS.title} weight={900} spacing={10} glow />
+          <Txt x={LX} y={200} text="为什么" size={52} color={P.red} font={FONTS.title} weight={900} spacing={10} glow />
           <Txt x={RX0 + 380} y={200} text="怎么做" size={52} color={P.gold} font={FONTS.title} weight={900} spacing={10} o={span(s, 105.7, 106.3)} glow />
         </g>
         {compare > 0 && walk < 1 && (
@@ -327,7 +329,7 @@ export const R7: React.FC<SP> = ({s}) => {
             <Bubble x={LX + Math.cos(s * 2) * 40} y={460} w={340} h={72} text="我怎么这么蠢。" size={32} dark tail="none" o={span(s, 111.9, 112.4)} />
             <Bubble x={lerp(RX0 + 300, RX0 + 520, span(s, 115.2, 118))} y={460} w={460} h={72} text="明天发条消息，解释一下。" size={30} tail="none" o={span(s, 114.9, 115.4)} />
             <g transform={`translate(${lerp(RX0 + 300, RX0 + 520, span(s, 115.2, 118)) + 260},460)`} opacity={span(s, 116.8, 117.3)}>
-              <circle r={24} fill={P.green} />
+              <circle r={24} fill={P.gold} />
               <path d="M-11,0 L-3,9 L12,-9" stroke="#0A1A10" strokeWidth={4} fill="none" />
             </g>
           </g>
@@ -351,13 +353,23 @@ export const R8: React.FC<SP> = ({s}) => {
     ctx.translate(W / 2, H / 2);
     ctx.scale(z, z);
     ctx.translate(-W / 2 - 80, -H / 2 + 30);
-    drawRoom(ctx, t, dawn);
-    const {hx, hy} = lyingPerson(ctx, t, 1);
+    ctx.restore();
+    const pc = paintCanvas();
+    pc.translate(W / 2, H / 2);
+    pc.scale(z, z);
+    pc.translate(-W / 2 - 80, -H / 2 + 30);
+    const {hx, hy} = paintRoom(pc, t, dawn);
+    halftone(ctx, {cell: 8, t, color: dawn > 0.5 ? P.ember : P.gold, gamma: 1.3, min: 0.06});
+    ctx.save();
+    ctx.translate(W / 2, H / 2);
+    ctx.scale(z, z);
+    ctx.translate(-W / 2 - 80, -H / 2 + 30);
+    dust(ctx, t, 140, dawn > 0.4 ? P.ember : P.gold, 0.4 + 0.3 * dawn);
     const bubble = span(t, 133.0, 133.8);
     const pause = span(t, 136.7, 137.6);
     const unroll = span(t, 139.7, 142.6);
     if (unroll < 1) {
-      flowRing(ctx, 133 + (t - 133) * (1 - 0.85 * pause), {yaw: 0, pitch: 0.35, cx: hx, cy: hy - 150, scale: 1}, {R: 110, r: 8, n: 800, speed: 1.4, color: P.ember, size: 4.5, alpha: bubble * (1 - unroll)});
+      flowRing(ctx, 133 + (t - 133) * (1 - 0.85 * pause), {yaw: 0, pitch: 0.35, cx: hx, cy: hy - 110, scale: 1}, {R: 110, r: 8, n: 800, speed: 1.4, color: P.red, size: 4.5, alpha: bubble * (1 - unroll)});
     }
     if (unroll > 0) {
       // 圈被拉直，变成一条流向窗口的光
@@ -368,7 +380,7 @@ export const R8: React.FC<SP> = ({s}) => {
         const k = (hash(i * 0.7) + t * 0.15) % 1;
         if (k > unroll) continue;
         const x = lerp(hx, wx, k);
-        const y = lerp(hy - 150, wy, k) - Math.sin(k * Math.PI) * 180 + (hash(i * 2.1) - 0.5) * 24;
+        const y = lerp(hy - 110, wy, k) - Math.sin(k * Math.PI) * 180 + (hash(i * 2.1) - 0.5) * 24;
         const sz = 3 + hash(i * 3.1) * 4;
         ctx.globalAlpha = 0.8 * (1 - 0.4 * dawn);
         ctx.drawImage(spr, x - sz, y - sz, sz * 2, sz * 2);

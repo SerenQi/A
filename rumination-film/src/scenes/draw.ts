@@ -31,7 +31,7 @@ export const dust = (ctx: CanvasRenderingContext2D, t: number, n = 220, color: s
 export const bokeh = (ctx: CanvasRenderingContext2D, t: number, n = 70) => {
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  const cols = ['#F2A65A', '#E8C27A', '#7FB4E6', '#E5483C', '#FFD39A'];
+  const cols = ['#F2A65A', '#E8C27A', '#C9A06A', '#E5483C', '#FFD39A'];
   for (let i = 0; i < n; i++) {
     const r = 30 + hash(i * 3.1) * 110;
     const x = (hash(i) * (W + 300) - 150 + Math.sin(t * 0.2 + i) * 30) % (W + 300);
@@ -59,8 +59,8 @@ export const streaks = (ctx: CanvasRenderingContext2D, t: number, n = 320) => {
     const len = 60 + hash(i + 3) * 140;
     const y = ((t * sp + hash(i + 2) * (H + 400)) % (H + 400)) - 300;
     const g = ctx.createLinearGradient(x, y, x - 8, y + len);
-    g.addColorStop(0, 'rgba(191,227,255,0)');
-    g.addColorStop(1, `rgba(191,227,255,${0.15 + hash(i + 4) * 0.25})`);
+    g.addColorStop(0, 'rgba(255,230,190,0)');
+    g.addColorStop(1, `rgba(255,230,190,${0.1 + hash(i + 4) * 0.18})`);
     ctx.strokeStyle = g;
     ctx.lineWidth = 1 + hash(i + 5) * 2;
     ctx.beginPath();
@@ -69,8 +69,8 @@ export const streaks = (ctx: CanvasRenderingContext2D, t: number, n = 320) => {
     ctx.stroke();
   }
   const top = ctx.createRadialGradient(W / 2, -100, 0, W / 2, -100, 900);
-  top.addColorStop(0, 'rgba(191,227,255,0.25)');
-  top.addColorStop(1, 'rgba(191,227,255,0)');
+  top.addColorStop(0, 'rgba(255,230,190,0.18)');
+  top.addColorStop(1, 'rgba(255,230,190,0)');
   ctx.fillStyle = top;
   ctx.fillRect(0, 0, W, H);
   ctx.restore();
@@ -173,4 +173,22 @@ export const mixColor = (a: string, b: string, t: number) => {
   const pb = [1, 3, 5].map((i) => parseInt(b.slice(i, i + 2), 16));
   const m = pa.map((v, i) => Math.round(lerp(v, pb[i], Math.max(0, Math.min(1, t)))));
   return '#' + m.map((v) => v.toString(16).padStart(2, '0')).join('');
+};
+
+/** 点阵地面：透视排列的金色小点，越远越密越暗 */
+export const dotFloor = (ctx: CanvasRenderingContext2D, horizon: number, alpha = 0.5) => {
+  const spr = glowSprite(P.gold);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (let k = 1; k < 26; k++) {
+    const f = Math.pow(k / 26, 2.0);
+    const y = horizon + f * (H - horizon + 120);
+    const gap = 26 + f * 120;
+    const r = 1.2 + f * 4;
+    ctx.globalAlpha = alpha * Math.min(1, 0.15 + f * 1.2);
+    for (let x = W / 2 - Math.floor(W / 2 / gap) * gap - gap; x < W + gap; x += gap) {
+      ctx.drawImage(spr, x - r, y - r, r * 2, r * 2);
+    }
+  }
+  ctx.restore();
 };

@@ -3,22 +3,22 @@ import {W, H} from '../config';
 import {hash, lerp} from './anim';
 import {glowSprite} from './points';
 
-const VP = {l: 520, r: 1400, t: 280, b: 720};
+export const VP = {l: 520, r: 1400, t: 280, b: 720};
 type XY = [number, number];
 /** 右墙上的点：u 0 近 → 1 远，v 0 上 → 1 下 */
-const rightWall = (u: number, v: number): XY => {
+export const rightWall = (u: number, v: number): XY => {
   const top: XY = [lerp(W, VP.r, u), lerp(0, VP.t, u)];
   const bot: XY = [lerp(W, VP.r, u), lerp(H, VP.b, u)];
   return [lerp(top[0], bot[0], v), lerp(top[1], bot[1], v)];
 };
 /** 地面上的点：u 0 左 → 1 右，w 0 近 → 1 远 */
-const floor = (u: number, w: number): XY => {
+export const floor = (u: number, w: number): XY => {
   const l: XY = [lerp(0, VP.l, w), lerp(H, VP.b, w)];
   const r: XY = [lerp(W, VP.r, w), lerp(H, VP.b, w)];
   return [lerp(l[0], r[0], u), lerp(l[1], r[1], u)];
 };
 
-const poly = (ctx: CanvasRenderingContext2D, pts: XY[]) => {
+export const poly = (ctx: CanvasRenderingContext2D, pts: XY[]) => {
   ctx.beginPath();
   pts.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
   ctx.closePath();
