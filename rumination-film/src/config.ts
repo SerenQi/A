@@ -39,7 +39,7 @@ export const FONTS = {
   sans: '"Noto Sans SC", sans-serif',
 };
 
-export const SUBTITLE = {baseline: 985, size: 36, maxCharsPerLine: 26, color: PALETTE.text, highlight: PALETTE.red};
+export const SUBTITLE = {baseline: 1000, size: 48, maxCharsPerLine: 22, color: PALETTE.text, highlight: PALETTE.red};
 
 export type Cue = {from: number; to: number; text: string};
 
@@ -107,6 +107,25 @@ export const WORDS = [
 export const ONSCREEN = {
   kicker: '人为什么会停不下来地内耗？',
   en: 'RUMINATION',
+  thoughts: [
+    '我是不是说错话了',
+    '他为什么不回',
+    '要是当时没说就好了',
+    '大家会怎么看我',
+    '我怎么总是这样',
+    '是不是我的问题',
+    '早知道就不该……',
+    '他是不是生气了',
+    '为什么偏偏是我',
+    '她那句话什么意思',
+    '我是不是很蠢',
+    '明天怎么面对',
+    '又搞砸了',
+    '如果重来一次',
+    '当时应该怎么说',
+  ],
+  chat: ['小林', '那我先走啦', '好，路上小心', '在吗，那天的事', '你别往心里去哈', '已读', '对方正在输入…', '21:40', '23:14', '02:47'],
+  cards: ['想：为什么会这样', '想：现在什么感受', '想：会有什么后果', '想：不相干的画面', '8 分钟'],
   title: '反刍思维',
   bigwords: ['越想越难受。', '反而更差。', '原地打转。'],
   question: '人为什么会停不下来地内耗？',

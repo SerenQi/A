@@ -192,3 +192,57 @@ export const dotFloor = (ctx: CanvasRenderingContext2D, horizon: number, alpha =
   }
   ctx.restore();
 };
+
+/** 一圈在转的内心独白：文字排在环上，近大远小、近亮远暗 */
+export const textRing = (
+  ctx: CanvasRenderingContext2D,
+  t: number,
+  cam: Cam3,
+  o: {phrases: string[]; R: number; speed: number; color: string; size?: number; alpha?: number; center?: P3; tilt?: number; font?: string; offset?: number},
+) => {
+  const c = o.center ?? {x: 0, y: 0, z: 0};
+  const tilt = o.tilt ?? 0;
+  const ct = Math.cos(tilt);
+  const st = Math.sin(tilt);
+  const n = o.phrases.length;
+  const items = o.phrases.map((text, i) => {
+    const a = (i / n) * Math.PI * 2 + t * o.speed + (o.offset ?? 0);
+    const x = Math.cos(a) * o.R;
+    const z = Math.sin(a) * o.R;
+    const p = {x: x + c.x, y: -z * st + c.y, z: z * ct + c.z};
+    return {text, q: project(p, cam)};
+  });
+  items.sort((a, b) => b.q.z - a.q.z);
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const {text, q} of items) {
+    const depth = Math.max(0, Math.min(1, 0.5 - q.z / (o.R * 2)));
+    const size = (o.size ?? 34) * q.k;
+    ctx.font = `600 ${size.toFixed(1)}px ${o.font ?? '"Noto Sans SC", sans-serif'}`;
+    ctx.globalAlpha = (o.alpha ?? 1) * (0.2 + 0.8 * depth);
+    ctx.shadowColor = o.color;
+    ctx.shadowBlur = 18 * depth;
+    ctx.fillStyle = o.color;
+    ctx.fillText(text, q.x, q.y);
+  }
+  ctx.restore();
+};
+
+/** 背景里缓慢漂过的大字念头（当作纹理，很淡） */
+export const thoughtFog = (ctx: CanvasRenderingContext2D, t: number, phrases: string[], alpha = 0.08, color = '#E8C27A') => {
+  ctx.save();
+  ctx.textBaseline = 'middle';
+  for (let i = 0; i < 14; i++) {
+    const size = 44 + hash(i * 3.3) * 70;
+    const y = 120 + hash(i * 1.9) * (H - 260);
+    const speed = 14 + hash(i * 2.7) * 26;
+    const w = size * 9;
+    const x = ((hash(i) * (W + w) - t * speed) % (W + w) + (W + w)) % (W + w) - w * 0.5;
+    ctx.font = `900 ${size}px "Noto Serif SC", serif`;
+    ctx.globalAlpha = alpha * (0.5 + hash(i * 4.1));
+    ctx.fillStyle = color;
+    ctx.fillText(phrases[i % phrases.length], x, y);
+  }
+  ctx.restore();
+};

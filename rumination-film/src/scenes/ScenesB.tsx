@@ -6,7 +6,8 @@ import {Canvas} from '../components/Canvas';
 import {personCloud, slumpCloud} from '../lib/clouds';
 import {Cam3, P3, drawPoints, glowSprite, lerp3, sphere} from '../lib/points';
 import {drawRoom, windowCenter} from '../lib/room';
-import {bg, dotFloor, dust, flowRing, glowDot, glowLine, mixColor} from './draw';
+import {bg, dotFloor, dust, flowRing, glowDot, glowLine, mixColor, textRing, thoughtFog} from './draw';
+import {ONSCREEN} from '../config';
 import {paintCanvas, halftone} from '../lib/halftone';
 import {paintRoom} from '../lib/paint';
 import {lyingPerson} from './ScenesA';
@@ -65,9 +66,9 @@ export const R5: React.FC<SP> = ({s}) => {
       for (let row = 0; row < 2; row++) {
         for (let k = 0; k < 4; k++) {
           const idx = row * 4 + k;
-          const sc = row === 0 ? 0.62 : 0.8;
-          const x = gx + (k - 1.5) * (row === 0 ? 150 : 190) + (row === 0 ? 40 : -20);
-          const y = row === 0 ? 600 : 720;
+          const sc = row === 0 ? 0.8 : 1.02;
+          const x = gx + (k - 1.5) * (row === 0 ? 170 : 205) + (row === 0 ? 45 : -25);
+          const y = row === 0 ? 650 : 800;
           const pts = pc.map((p, i) => lerp3(p, sl[i], slump));
           const appear = span(t, 42.0 + idx * 0.08, 43.2 + idx * 0.08);
           drawPoints(ctx, pts, {yaw: -0.3 + hash(idx + gi * 9) * 0.6, pitch: 0, cx: x, cy: y - 130 * sc, scale: sc}, {color: col, size: 3.8, alpha: 0.9 * appear * (1 - 0.5 * solve), t: t + idx, shade: true});
@@ -77,11 +78,12 @@ export const R5: React.FC<SP> = ({s}) => {
     // 左：每个人头上都在绕圈，上空压着一团阴云
     if (leftThink > 0) {
       const a = leftThink * (1 - solve);
-      flowRing(ctx, t, {yaw: 0, pitch: 0.32, cx: L, cy: 410, scale: 1}, {R: 330, r: 30, n: 2600, speed: 1.6, color: P.red, size: 4.5, alpha: 0.75 * a});
+      textRing(ctx, t, {yaw: 0, pitch: 0.32, cx: L, cy: 400, scale: 1}, {phrases: ONSCREEN.thoughts.slice(0, 9), R: 360, speed: 0.6, color: '#F0A090', size: 26, alpha: a});
+      flowRing(ctx, t, {yaw: 0, pitch: 0.32, cx: L, cy: 400, scale: 1}, {R: 330, r: 30, n: 2600, speed: 1.6, color: P.red, size: 4.5, alpha: 0.75 * a});
       const cloud: P3[] = sphere(1400, 260, 41).map((p) => ({x: p.x * 1.6, y: p.y * 0.35, z: p.z * 0.6}));
       ctx.save();
       ctx.globalAlpha = a * span(t, 50, 57);
-      drawPoints(ctx, cloud, {yaw: t * 0.05, pitch: 0, cx: L, cy: 200, scale: 1}, {color: '#7A6A5A', size: 6, alpha: 0.45, t});
+      drawPoints(ctx, cloud, {yaw: t * 0.05, pitch: 0, cx: L, cy: 330, scale: 1}, {color: '#7A6A5A', size: 6, alpha: 0.25, t});
       ctx.restore();
     }
     // 右：想些不相干的画面——漂浮的小星团
@@ -134,6 +136,12 @@ export const R5: React.FC<SP> = ({s}) => {
         </g>
         <Txt x={L} y={130} text="想自己" size={46} color={P.red} font={FONTS.title} weight={900} spacing={10} o={leftThink * (1 - solve)} glow />
         <Txt x={R} y={130} text="想别的" size={46} color={P.ember} font={FONTS.title} weight={900} spacing={10} o={rightThink * (1 - solve)} glow />
+        <g opacity={leftThink * (1 - solve)}>
+          {['想：为什么会这样', '想：现在什么感受', '想：会有什么后果'].map((x, i) => (
+            <Txt key={i} x={L} y={192 + i * 40} text={x} size={28} color={P.text} o={0.85} />
+          ))}
+        </g>
+        <Txt x={R} y={192} text="想：不相干的画面" size={28} color={P.text} o={0.85 * rightThink * (1 - solve)} />
         <Txt x={L - 320} y={232} text="办法" size={26} color={P.dim} anchor="start" o={solve} />
         <Txt x={R - 320} y={232} text="办法" size={26} color={P.dim} anchor="start" o={solve} />
       </Svg>
@@ -151,6 +159,7 @@ export const R6: React.FC<SP> = ({s}) => {
   const draw = (ctx: CanvasRenderingContext2D, t: number) => {
     bg(ctx);
     dust(ctx, t, 200, P.gold, 0.4);
+    thoughtFog(ctx, t, ONSCREEN.thoughts, 0.045, '#E5483C');
     const intro = win(t, 73.4, 76.9, 0.5, 0.6);
     if (intro > 0) flowRing(ctx, t, {yaw: 0, pitch: 0.2, cx: W / 2, cy: 470, scale: 1}, {R: 260, r: 20, n: 2400, speed: 1.2, color: P.red, size: 4.5, alpha: 0.8 * intro});
     const zoom = span(t, 88.6, 90.2);
@@ -189,6 +198,7 @@ export const R6: React.FC<SP> = ({s}) => {
     }
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
+    if (loopIn > 0) textRing(ctx, t, {yaw: 0, pitch: 0, cx: LOOP.x, cy: LOOP.y, scale: 1}, {phrases: ONSCREEN.thoughts.slice(0, 8), R: LOOP.r + 70, speed: 0.55, color: '#F3C0B0', size: 24, alpha: loopIn * span(t, 79.8, 80.6), tilt: Math.PI / 2});
     // 下一步
     const nb = span(t, 85.7, 86.4) * (1 - zoom);
     if (nb > 0) {
@@ -217,13 +227,6 @@ export const R6: React.FC<SP> = ({s}) => {
           <Txt x={240} y={Y2 + 12} text="反刍" size={40} color={P.red} anchor="end" font={FONTS.title} weight={900} glow />
           <Txt x={1755} y={Y1 + 12} text="下一步" size={34} color={P.ember} weight={600} o={nb} />
           <Txt x={1755} y={Y2 + 12} text="下一步" size={34} color={P.red} weight={600} o={nb * 0.35} />
-          {[
-            {text: '为什么是我？', t0: 79.9},
-            {text: '要是当时……', t0: 82.7},
-          ].map((b, i) => {
-            const a = s * 1.1 + i * Math.PI;
-            return <Bubble key={i} x={LOOP.x + Math.cos(a) * LOOP.r} y={LOOP.y + Math.sin(a) * LOOP.r - 80} w={250} h={58} text={b.text} size={26} dark o={span(s, b.t0, b.t0 + 0.5) * loopIn} tail="none" />;
-          })}
         </g>
       </Svg>
     </>
@@ -321,13 +324,13 @@ export const R7: React.FC<SP> = ({s}) => {
       <Canvas s={s} draw={draw} />
       <Svg>
         <g opacity={split * (1 - compare) * (1 - walk)}>
-          <Txt x={LX} y={200} text="为什么" size={52} color={P.red} font={FONTS.title} weight={900} spacing={10} glow />
-          <Txt x={RX0 + 380} y={200} text="怎么做" size={52} color={P.gold} font={FONTS.title} weight={900} spacing={10} o={span(s, 105.7, 106.3)} glow />
+          <Txt x={LX} y={200} text="为什么" size={66} color={P.red} font={FONTS.title} weight={900} spacing={10} glow />
+          <Txt x={RX0 + 380} y={200} text="怎么做" size={66} color={P.gold} font={FONTS.title} weight={900} spacing={10} o={span(s, 105.7, 106.3)} glow />
         </g>
         {compare > 0 && walk < 1 && (
           <g opacity={compare * (1 - walk)}>
-            <Bubble x={LX + Math.cos(s * 2) * 40} y={460} w={340} h={72} text="我怎么这么蠢。" size={32} dark tail="none" o={span(s, 111.9, 112.4)} />
-            <Bubble x={lerp(RX0 + 300, RX0 + 520, span(s, 115.2, 118))} y={460} w={460} h={72} text="明天发条消息，解释一下。" size={30} tail="none" o={span(s, 114.9, 115.4)} />
+            <Bubble x={LX + Math.cos(s * 2) * 40} y={460} w={420} h={88} text="我怎么这么蠢。" size={40} dark tail="none" o={span(s, 111.9, 112.4)} />
+            <Bubble x={lerp(RX0 + 300, RX0 + 520, span(s, 115.2, 118))} y={460} w={560} h={88} text="明天发条消息，解释一下。" size={38} tail="none" o={span(s, 114.9, 115.4)} />
             <g transform={`translate(${lerp(RX0 + 300, RX0 + 520, span(s, 115.2, 118)) + 260},460)`} opacity={span(s, 116.8, 117.3)}>
               <circle r={24} fill={P.gold} />
               <path d="M-11,0 L-3,9 L12,-9" stroke="#0A1A10" strokeWidth={4} fill="none" />

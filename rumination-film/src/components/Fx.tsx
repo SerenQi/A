@@ -217,9 +217,9 @@ export const Corners: React.FC<{s: number}> = ({s}) => {
   const src = ONSCREEN.sources.find((x) => s >= x.from && s < x.to);
   return (
     <>
-      <div style={{position: 'absolute', left: 70, top: 52, fontFamily: FONTS.body, fontSize: 22, letterSpacing: 4, color: P.text, opacity: q * 0.75}}>{ONSCREEN.question}</div>
+      <div style={{position: 'absolute', left: 64, top: 44, fontFamily: FONTS.body, fontSize: 32, letterSpacing: 4, color: P.text, opacity: q * 0.75}}>{ONSCREEN.question}</div>
       {src && (
-        <div style={{position: 'absolute', right: 70, top: 52, fontFamily: FONTS.body, fontSize: 18, letterSpacing: 3, color: P.dim, opacity: win(s, src.from, src.to, 0.8, 0.8) * 0.8, fontStyle: 'italic'}}>
+        <div style={{position: 'absolute', right: 64, top: 50, fontFamily: FONTS.body, fontSize: 24, letterSpacing: 3, color: P.dim, opacity: win(s, src.from, src.to, 0.8, 0.8) * 0.8, fontStyle: 'italic'}}>
           {src.text}
         </div>
       )}
@@ -240,12 +240,12 @@ export const BigWords: React.FC<{s: number}> = ({s}) => {
         position: 'absolute',
         left: 0,
         width: W,
-        top: H / 2 - 90,
+        top: H / 2 - 130,
         textAlign: 'center',
         fontFamily: FONTS.title,
         fontWeight: 900,
-        fontSize: 130,
-        letterSpacing: 10,
+        fontSize: 180,
+        letterSpacing: 12,
         color: w.color,
         opacity: o,
         transform: `scale(${lerp(1.08, 1, e) + t * 0.008})`,

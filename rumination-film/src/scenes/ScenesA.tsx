@@ -9,7 +9,7 @@ import {Cam3, P3, drawPoints, lerp3, scatter} from '../lib/points';
 import {bedPoint, drawRoom} from '../lib/room';
 import {paintCanvas, halftone} from '../lib/halftone';
 import {paintHead, paintRoom} from '../lib/paint';
-import {bg, bokeh, dust, flowRing, glowDot, mixColor, streaks} from './draw';
+import {bg, bokeh, dust, flowRing, glowDot, mixColor, streaks, textRing, thoughtFog} from './draw';
 
 const Svg: React.FC<{children: React.ReactNode}> = ({children}) => (
   <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{position: 'absolute', inset: 0}}>
@@ -65,7 +65,7 @@ export const R1: React.FC<SP> = ({s}) => {
     if (a > 0) {
       ctx.save();
       ctx.globalAlpha = a;
-      const z = lerp(1.0, 1.1, span(t, 0, 3.6));
+      const z = lerp(1.12, 1.3, span(t, 0, 3.6));
       ctx.translate(W / 2, H / 2);
       ctx.scale(z, z);
       ctx.translate(-W / 2 - 80, -H / 2 + 30);
@@ -82,6 +82,17 @@ export const R1: React.FC<SP> = ({s}) => {
       ctx.translate(-W / 2 - 80, -H / 2 + 30);
       dust(ctx, t, 120, P.gold, 0.4 * a);
       flowRing(ctx, t, {yaw: 0, pitch: 0.35, cx: hx, cy: hy - 110, scale: 1}, {R: 110, r: 8, n: 800, speed: 1.4, color: P.red, size: 4.5, alpha: a});
+      ctx.textAlign = 'center';
+      for (let i = 0; i < 5; i++) {
+        const k = ((t * 0.32 + i * 0.2) % 1);
+        ctx.font = `600 ${30 + 10 * k}px "Noto Sans SC", sans-serif`;
+        ctx.globalAlpha = a * Math.sin(k * Math.PI) * 0.9;
+        ctx.fillStyle = i % 2 ? P.ember : P.text;
+        ctx.shadowColor = P.gold;
+        ctx.shadowBlur = 14;
+        ctx.fillText(ONSCREEN.thoughts[i], hx + (hash(i) - 0.5) * 420, hy - 180 - k * 300);
+      }
+      ctx.shadowBlur = 0;
       ctx.restore();
     }
     if (b > 0) {
@@ -147,12 +158,13 @@ export const R1: React.FC<SP> = ({s}) => {
       ctx.globalAlpha = d;
       dust(ctx, t, 200, P.gold, 0.5);
       const yaw = -0.5 + (t - 9.5) * 0.2;
-      const cam: Cam3 = {yaw, pitch: 0.08, cx: W / 2, cy: 560, scale: 1.05};
+      const cam: Cam3 = {yaw, pitch: 0.08, cx: W / 2, cy: 600, scale: 1.25};
       drawPoints(ctx, headCloud(), cam, {color: P.gold, size: 4.4, alpha: 0.8 * d, t, shade: true});
       const speed = 1 + span(t, 9.7, 12.8) * 3;
-      for (let k = 0; k < 4; k++) {
+      textRing(ctx, t * speed * 0.6, cam, {phrases: ONSCREEN.thoughts.slice(0, 10), R: 470, speed: 0.5, color: P.ember, size: 36, alpha: span(t, 9.6, 10.4) * d, center: {x: 0, y: -110, z: 0}, tilt: 0.3});
+      for (let k = 0; k < 3; k++) {
         flowRing(ctx, t * speed + k, cam, {
-          R: 230 + k * 90,
+          R: 250 + k * 110,
           r: 8 + k * 2,
           n: 900,
           speed: 1.1 - k * 0.15,
@@ -172,12 +184,19 @@ export const R1: React.FC<SP> = ({s}) => {
       <Svg>
         {a > 0 && <Clock text="03:00" o={a} />}
         {b > 0 && (
-          <g opacity={b}>
-            <Txt x={W / 2} y={300} text="23:14" size={24} color={P.dim} o={span(s, 3.5, 3.9)} />
-            <Bubble x={1060} y={390} w={340} h={80} text="在吗，那天的事" size={32} tail="r" color="#E8C27A" o={span(s, 3.6, 4.0)} />
-            <Txt x={1225} y={462} text="已读" size={22} color={P.dim} anchor="end" o={span(s, 4.2, 4.5)} />
-            <Txt x={W / 2} y={560} text="02:47" size={24} color={P.dim} o={span(s, 5.0, 5.4)} />
-            <Txt x={700} y={640} text={Math.sin(s * 6) > 0 ? '对方正在输入…' : ''} size={28} color={P.dim} anchor="start" o={span(s, 5.2, 5.5)} />
+          <g opacity={b} transform={`translate(0,${-lerp(0, 160, span(s, 3.5, 6.4))})`}>
+            <rect x={560} y={120} width={800} height={1000} rx={40} fill="#0E0F14" opacity={0.85} stroke="#2A2C33" strokeWidth={2} />
+            <Txt x={W / 2} y={190} text="小林" size={34} color={P.text} weight={600} />
+            <line x1={560} x2={1360} y1={225} y2={225} stroke="#2A2C33" strokeWidth={2} />
+            <Txt x={W / 2} y={290} text="21:40" size={24} color={P.dim} />
+            <Bubble x={760} y={360} w={330} h={84} text="那我先走啦" size={36} dark tail="l" />
+            <Bubble x={1140} y={470} w={340} h={84} text="好，路上小心" size={36} tail="r" color="#C9A06A" />
+            <Txt x={W / 2} y={570} text="23:14" size={24} color={P.dim} o={span(s, 3.5, 3.8)} />
+            <Bubble x={1100} y={640} w={420} h={84} text="在吗，那天的事" size={36} tail="r" color="#E8C27A" o={span(s, 3.6, 3.9)} />
+            <Bubble x={1080} y={750} w={460} h={84} text="你别往心里去哈" size={36} tail="r" color="#E8C27A" o={span(s, 4.0, 4.3)} />
+            <Txt x={1320} y={820} text="已读" size={26} color={P.dim} anchor="end" o={span(s, 4.5, 4.8)} />
+            <Txt x={W / 2} y={900} text="02:47" size={24} color={P.dim} o={span(s, 5.2, 5.5)} />
+            <Txt x={600} y={980} text={Math.sin(s * 6) > 0 ? '对方正在输入…' : ''} size={32} color={P.dim} anchor="start" o={span(s, 5.4, 5.7)} />
           </g>
         )}
         {c > 0 && <Txt x={1300} y={760} text="三年前" size={30} color={P.paper} o={span(s, 7.6, 8.2) * c} spacing={10} />}
@@ -239,7 +258,7 @@ export const R3: React.FC<SP> = ({s}) => {
     const assemble = span(t, 17.2, 18.6);
     const sc = scatter(N, 2600, 1500, 1400, 31);
     const cowCam: Cam3 = {yaw: -0.35 + Math.sin(t * 0.4) * 0.08, pitch: 0.12, cx: 900, cy: 520, scale: 0.95};
-    const headCam: Cam3 = {yaw: -0.3 + (t - 24) * 0.05, pitch: 0.05, cx: 860, cy: 560, scale: 1.0};
+    const headCam: Cam3 = {yaw: -0.3 + (t - 24) * 0.05, pitch: 0.05, cx: 900, cy: 600, scale: 1.2};
     const yaw = lerp(cowCam.yaw, headCam.yaw, morph);
     const cam: Cam3 = {yaw, pitch: lerp(cowCam.pitch, headCam.pitch, morph), cx: lerp(cowCam.cx, headCam.cx, morph), cy: lerp(cowCam.cy, headCam.cy, morph), scale: lerp(cowCam.scale!, headCam.scale!, morph)};
     // 草地
@@ -286,6 +305,7 @@ export const R3: React.FC<SP> = ({s}) => {
         flowRing(ctx, t + k * 0.4, cam, {R: 200 + k * 26, r: 7, n: 700, speed: 1.3, color: k === 0 ? P.ember : P.red, size: 4.5, alpha: (morph - 0.6) * 2.5 * (k === 0 ? 1 : 0.55), center: {x: 30, y: -120, z: 0}, tilt: 0.3 + k * 0.05});
       }
       glowDot(ctx, cam.cx + 30, cam.cy - 120, 220, P.gold, 0.25 * morph);
+      textRing(ctx, t, cam, {phrases: ONSCREEN.thoughts.slice(3, 13), R: 430, speed: 0.45, color: P.ember, size: 34, alpha: span(t, 24.6, 25.6), center: {x: 30, y: -120, z: 0}, tilt: 0.28});
     }
   };
   return <Canvas s={s} draw={draw} />;
@@ -298,12 +318,14 @@ export const R4: React.FC<SP> = ({s}) => {
   const draw = (ctx: CanvasRenderingContext2D, t: number) => {
     bg(ctx);
     dust(ctx, t, 220, P.gold, 0.45);
-    const cam: Cam3 = {yaw: t * 0.05, pitch: lerp(0.32, 1.5, reveal), cx: W / 2, cy: 470, scale: 1};
+    thoughtFog(ctx, t, ONSCREEN.thoughts, 0.05);
+    const cam: Cam3 = {yaw: t * 0.05, pitch: lerp(0.32, 1.5, reveal), cx: W / 2, cy: 470, scale: 1.25};
     // 核心：答案
-    glowDot(ctx, W / 2, 470, 260, P.ember, 0.5 * ans);
+    glowDot(ctx, W / 2, 470, 340, P.ember, 0.55 * ans);
     glowDot(ctx, W / 2, 470, 60, '#FFFFFF', 0.8 * ans);
     // 粒子环：一直绕，距离不变
     flowRing(ctx, t, cam, {R: 420, r: 26, n: 4200, speed: 0.9, color: P.gold, size: 4.5, alpha: 0.85});
+    textRing(ctx, t, cam, {phrases: ONSCREEN.thoughts, R: 470, speed: 0.25, color: P.text, size: 30, alpha: 0.9 * (1 - 0.5 * reveal)});
     flowRing(ctx, t + 3, cam, {R: 420, r: 6, n: 900, speed: 0.9, color: P.ember, size: 6, alpha: 0.9});
     // 领头的光点与它到答案的距离
     const a = t * 1.4;
@@ -315,7 +337,7 @@ export const R4: React.FC<SP> = ({s}) => {
     const z1 = -lead.x * sy + lead.z * cy;
     const y2 = -z1 * Math.sin(cam.pitch);
     const z2 = z1 * Math.cos(cam.pitch);
-    const k = 1400 / (1400 + z2);
+    const k = (1400 / (1400 + z2)) * 1.25;
     const px = W / 2 + x1 * k;
     const py = 470 + y2 * k;
     for (let i = 0; i < 26; i++) {
@@ -323,7 +345,7 @@ export const R4: React.FC<SP> = ({s}) => {
       const q = {x: Math.cos(b) * 420, z: Math.sin(b) * 420};
       const qx1 = q.x * cy + q.z * sy;
       const qz1 = -q.x * sy + q.z * cy;
-      const qk = 1400 / (1400 + qz1 * Math.cos(cam.pitch));
+      const qk = (1400 / (1400 + qz1 * Math.cos(cam.pitch))) * 1.25;
       glowDot(ctx, W / 2 + qx1 * qk, 470 - qz1 * Math.sin(cam.pitch) * qk, 26 * (1 - i / 26), P.ember, 0.9 * (1 - i / 26));
     }
     if (reveal > 0) {
@@ -342,7 +364,7 @@ export const R4: React.FC<SP> = ({s}) => {
     <>
       <Canvas s={s} draw={draw} />
       <Svg>
-        <Txt x={W / 2} y={560} text="答案" size={44} color={P.ember} o={ans} font={FONTS.title} weight={600} spacing={12} glow />
+        <Txt x={W / 2} y={580} text="答案" size={64} color={P.ember} o={ans} font={FONTS.title} weight={600} spacing={12} glow />
       </Svg>
     </>
   );
