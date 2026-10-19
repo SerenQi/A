@@ -109,6 +109,7 @@ export const ONSCREEN = {
   label: ['洛伦兹吸引子', 'LORENZ ATTRACTOR'],
   end: ['算不准，但有形状。', 'Unpredictable — but it has a shape.'],
   kicker: '',
+  hook: '为什么天气预报，总是算不准？',
   cover: ['天气，就再也算不准了', '只差了'],
 };
 
