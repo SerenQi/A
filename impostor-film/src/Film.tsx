@@ -1,16 +1,17 @@
 import React from 'react';
-import {AbsoluteFill, Audio, interpolate, staticFile, useCurrentFrame} from 'remotion';
-import {CUES, DURATION_S, FPS, H, INK, MUSIC, ONSCREEN, SCENES, W} from './config';
+import {AbsoluteFill, Audio, staticFile, useCurrentFrame} from 'remotion';
+import {CUES, FPS, H, INK, ONSCREEN, SCENES, W} from './config';
 import {Canvas} from './components/Canvas';
 import {captionBar, ground, finish, hud} from './scenes/print';
 import {C0, C0_IMPACTS} from './scenes/C0';
+import {CHAPTERS, CH_IMPACTS} from './scenes/chapters';
 import {ensureFonts} from './lib/fonts';
 
 ensureFonts();
 
 type Scene = {key: keyof typeof SCENES; draw: (ctx: CanvasRenderingContext2D, s: number) => void};
-const LIST: Scene[] = [{key: 'C0', draw: C0}];
-const IMPACTS = [...C0_IMPACTS];
+const LIST: Scene[] = [{key: 'C0', draw: C0}, ...(['C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7'] as const).map((key) => ({key, draw: CHAPTERS[key]}))];
+const IMPACTS = [...C0_IMPACTS, ...CH_IMPACTS];
 
 const shakeAt = (s: number) => {
   let x = 0;
@@ -55,10 +56,8 @@ export const Film: React.FC = () => {
   return (
     <AbsoluteFill style={{background: INK.paper}}>
       <Canvas s={s} draw={draw} />
-      <Audio
-        src={staticFile(MUSIC.file)}
-        volume={(fr) => MUSIC.level * interpolate(fr / FPS, [0, 0.1, DURATION_S - 3, DURATION_S], [0.9, 1, 1, 0], {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'})}
-      />
+      {/* 只有音效；背景音乐发布时用平台自带的 */}
+      <Audio src={staticFile('audio/sfx.wav')} />
     </AbsoluteFill>
   );
 };

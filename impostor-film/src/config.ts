@@ -73,7 +73,6 @@ export const CUES: Cue[] = [
   {from: 102.6, to: 105.4, text: '**独行侠**：开口求助，等于承认失败。', en: 'The Soloist: asking for help means admitting failure.'},
   {from: 105.8, to: 108.6, text: '**专家型**：没懂到十成，就不敢开始。', en: 'The Expert: can\'t start until I know everything.'},
   {from: 109.0, to: 112.4, text: '**超人型**：比所有人都拼，才敢相信自己配得上。', en: 'The Superhuman: must outwork everyone to feel I deserve it.'},
-  {from: 113.0, to: 116.4, text: '你是哪一种？', en: 'Which one are you?'},
 
   {from: 118.4, to: 122.0, text: '那两位心理学家发现，很多人的家里有一种固定的分工：', en: 'The two psychologists noticed a fixed division of roles in many families:'},
   {from: 122.4, to: 126.0, text: '家里有一个“**聪明的孩子**”，而你是“懂事的那个”。', en: 'One sibling is "the smart one." You are "the sensible one."'},
@@ -108,11 +107,6 @@ export const ONSCREEN = {
   verdict: '结案：你没有骗任何人。',
   verdictEn: 'CASE CLOSED: YOU FOOLED NO ONE.',
   misc: ['1978', '150+', '62', '14,161', '2022', 'MIT', '99', '1', '七版', '焦虑', '准备', '拖延', '成了', '运气', '努力', '新任务', 'REC', '2026.10', '律师', '医生', '大学教师', '现象', 'PHENOMENON', 'GUILTY', 'CLOSED', '你'],
-};
-
-export const MUSIC = {
-  file: 'audio/bgm_A_hell_no_vocals.wav',
-  level: 0.55,
 };
 
 const flat = (v: unknown): string[] =>
