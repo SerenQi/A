@@ -21,7 +21,7 @@ export const slam = (t: number) => {
 // ---------- 纸 ----------
 
 let paperCache: HTMLCanvasElement | null = null;
-const paper = () => {
+export const paper = () => {
   if (paperCache) return paperCache;
   const c = document.createElement('canvas');
   c.width = W;
